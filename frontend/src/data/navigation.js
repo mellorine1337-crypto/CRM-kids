@@ -1,0 +1,95 @@
+import {
+  BarChart3,
+  Bell,
+  BookOpen,
+  CalendarDays,
+  CreditCard,
+  LayoutDashboard,
+  Lightbulb,
+  Link2,
+  MessageSquareMore,
+  Settings,
+  Sparkles,
+  Users,
+} from "lucide-react";
+
+export const navigationItems = [
+  {
+    to: "/",
+    labelKey: "navigation.dashboard",
+    icon: LayoutDashboard,
+    roles: ["STAFF", "PARENT"],
+  },
+  {
+    to: "/analytics",
+    labelKey: "navigation.analytics",
+    icon: BarChart3,
+    roles: ["STAFF"],
+  },
+  {
+    to: "/journal",
+    labelKey: "navigation.journal",
+    icon: BookOpen,
+    roles: ["STAFF", "PARENT"],
+  },
+  {
+    to: "/recommendations",
+    labelKey: "navigation.recommendations",
+    icon: Lightbulb,
+    roles: ["STAFF", "PARENT"],
+  },
+  {
+    to: "/children",
+    labelKey: "navigation.children",
+    icon: Users,
+    roles: ["STAFF", "PARENT"],
+  },
+  {
+    to: "/lessons",
+    labelKey: "navigation.lessons",
+    icon: CalendarDays,
+    roles: ["STAFF", "PARENT"],
+  },
+  {
+    to: "/enrollments",
+    labelKey: "navigation.enrollments",
+    icon: Sparkles,
+    roles: ["STAFF", "PARENT"],
+  },
+  {
+    to: "/attendance",
+    labelKey: "navigation.attendance",
+    icon: Sparkles,
+    roles: ["STAFF", "PARENT"],
+  },
+  {
+    to: "/payments",
+    labelKey: "navigation.payments",
+    icon: CreditCard,
+    roles: ["STAFF", "PARENT"],
+  },
+  {
+    to: "/feedback",
+    labelKey: "navigation.feedback",
+    icon: MessageSquareMore,
+    roles: ["STAFF", "PARENT"],
+  },
+  {
+    to: "/notifications",
+    labelKey: "navigation.notifications",
+    icon: Bell,
+    roles: ["STAFF", "PARENT"],
+  },
+  {
+    to: "/settings",
+    labelKey: "navigation.settings",
+    icon: Settings,
+    roles: ["STAFF", "PARENT"],
+  },
+  {
+    to: "/integrations",
+    labelKey: "navigation.integrations",
+    icon: Link2,
+    roles: ["STAFF"],
+  },
+];

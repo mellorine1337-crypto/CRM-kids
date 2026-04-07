@@ -1,0 +1,461 @@
+openapi: 3.0.3
+info:
+  title: Education Center CRM API
+  version: 1.0.0
+  description: REST API for the MVP CRM platform of an education center.
+servers:
+  - url: http://localhost:4000/api
+tags:
+  - name: Auth
+  - name: Users
+  - name: Children
+  - name: Analytics
+  - name: Lessons
+  - name: Enrollments
+  - name: Payments
+  - name: Attendance
+  - name: Feedback
+  - name: Notifications
+paths:
+  /health:
+    get:
+      tags: [Auth]
+      summary: Health check
+      responses:
+        "200":
+          description: API status
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterPayload"
+      responses:
+        "201":
+          description: User created
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginPayload"
+      responses:
+        "200":
+          description: User and JWT pair
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshPayload"
+      responses:
+        "200":
+          description: New access and refresh tokens
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Get current user profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+    patch:
+      tags: [Users]
+      summary: Update current user profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfilePayload"
+      responses:
+        "200":
+          description: Updated user
+  /children:
+    get:
+      tags: [Children]
+      summary: List children
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of children
+    post:
+      tags: [Children]
+      summary: Create a child
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChildPayload"
+      responses:
+        "201":
+          description: Child created
+  /children/{id}:
+    patch:
+      tags: [Children]
+      summary: Update a child
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Child updated
+    delete:
+      tags: [Children]
+      summary: Delete a child
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Child removed
+  /analytics/overview:
+    get:
+      tags: [Analytics]
+      summary: Get center analytics overview for staff
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Analytics overview
+  /lessons:
+    get:
+      tags: [Lessons]
+      summary: List lessons with filters
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: date
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: age
+          schema:
+            type: integer
+        - in: query
+          name: title
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of lessons
+    post:
+      tags: [Lessons]
+      summary: Create a lesson
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LessonPayload"
+      responses:
+        "201":
+          description: Lesson created
+  /enrollments:
+    get:
+      tags: [Enrollments]
+      summary: List all enrollments for staff
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Enrollments list
+    post:
+      tags: [Enrollments]
+      summary: Enroll a child into a lesson
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnrollmentPayload"
+      responses:
+        "201":
+          description: Enrollment created
+  /enrollments/my:
+    get:
+      tags: [Enrollments]
+      summary: List current parent enrollments
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Parent enrollments
+  /payments/create-intent:
+    post:
+      tags: [Payments]
+      summary: Create Stripe or mock payment intent
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentPayload"
+      responses:
+        "201":
+          description: Payment created
+  /payments/my:
+    get:
+      tags: [Payments]
+      summary: List current parent payments
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Parent payments
+  /attendance:
+    post:
+      tags: [Attendance]
+      summary: Mark lesson attendance
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttendancePayload"
+      responses:
+        "201":
+          description: Attendance marked
+  /attendance/{lessonId}:
+    get:
+      tags: [Attendance]
+      summary: Get attendance journal for a lesson
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: lessonId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Attendance list
+  /feedback:
+    get:
+      tags: [Feedback]
+      summary: List feedback threads for current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Feedback thread list
+    post:
+      tags: [Feedback]
+      summary: Create a feedback thread
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Feedback thread created
+  /feedback/options:
+    get:
+      tags: [Feedback]
+      summary: List recipients and children for feedback forms
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Feedback form options
+  /feedback/{id}:
+    get:
+      tags: [Feedback]
+      summary: Get feedback thread details
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Feedback thread
+  /feedback/{id}/messages:
+    post:
+      tags: [Feedback]
+      summary: Add a reply to a feedback thread
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          description: Feedback reply created
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List current user notifications
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Notification list
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    RegisterPayload:
+      type: object
+      required: [fullName, email, phone, password]
+      properties:
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        password:
+          type: string
+    LoginPayload:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    RefreshPayload:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+    UpdateProfilePayload:
+      type: object
+      properties:
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        newPassword:
+          type: string
+    ChildPayload:
+      type: object
+      required: [fullName, birthDate]
+      properties:
+        parentId:
+          type: string
+        fullName:
+          type: string
+        birthDate:
+          type: string
+          format: date-time
+        gender:
+          type: string
+          enum: [MALE, FEMALE, OTHER]
+        medicalNotes:
+          type: string
+    LessonPayload:
+      type: object
+      required:
+        - title
+        - ageMin
+        - ageMax
+        - date
+        - startTime
+        - endTime
+        - capacity
+        - teacherName
+        - price
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        ageMin:
+          type: integer
+        ageMax:
+          type: integer
+        date:
+          type: string
+          format: date-time
+        startTime:
+          type: string
+        endTime:
+          type: string
+        capacity:
+          type: integer
+        teacherName:
+          type: string
+        price:
+          type: number
+    EnrollmentPayload:
+      type: object
+      required: [childId, lessonId]
+      properties:
+        childId:
+          type: string
+        lessonId:
+          type: string
+    CreatePaymentPayload:
+      type: object
+      required: [enrollmentId]
+      properties:
+        enrollmentId:
+          type: string
+        currency:
+          type: string
+    AttendancePayload:
+      type: object
+      required: [enrollmentId, status]
+      properties:
+        enrollmentId:
+          type: string
+        status:
+          type: string
+          enum: [PRESENT, ABSENT]
+        comment:
+          type: string

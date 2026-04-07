@@ -1,0 +1,10 @@
+node_modules
+dist
+.DS_Store
+.env
+.env.local
+.postgres-data/
+backend/.env
+frontend/.env
+backend/uploads/*
+!backend/uploads/.gitkeep

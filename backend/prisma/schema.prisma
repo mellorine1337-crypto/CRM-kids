@@ -1,0 +1,282 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STAFF
+  PARENT
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum EnrollmentStatus {
+  BOOKED
+  CANCELLED
+  ATTENDED
+  MISSED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+}
+
+enum HomeworkStatus {
+  ASSIGNED
+  SUBMITTED
+  REVIEWED
+  OVERDUE
+}
+
+enum ProgressLevel {
+  EXCELLENT
+  GOOD
+  ATTENTION_REQUIRED
+}
+
+enum NotificationType {
+  CLASS_REMINDER
+  ENROLLMENT_CONFIRMED
+  PAYMENT_CONFIRMED
+  CLASS_CANCELLED
+  SYSTEM
+}
+
+enum NotificationChannel {
+  EMAIL
+  IN_APP
+}
+
+enum IntegrationType {
+  SCHOOL_SYSTEM
+  EDUCATION_PLATFORM
+  SUBSIDY_PROGRAM
+}
+
+enum IntegrationStatus {
+  PLANNED
+  ACTIVE
+  PAUSED
+  ERROR
+}
+
+model User {
+  id                   String         @id @default(cuid())
+  fullName             String
+  email                String         @unique
+  phone                String?
+  passwordHash         String
+  role                 Role           @default(PARENT)
+  children             Child[]        @relation("ParentChildren")
+  createdLessons       Lesson[]       @relation("LessonCreator")
+  payments             Payment[]      @relation("ParentPayments")
+  markedAttendances    Attendance[]   @relation("AttendanceMarker")
+  notifications        Notification[]
+  refreshTokens        RefreshToken[]
+  createdJournalEntries JournalEntry[] @relation("JournalEntryCreator")
+  updatedJournalEntries JournalEntry[] @relation("JournalEntryUpdater")
+  parentFeedbackThreads FeedbackThread[] @relation("ParentFeedbackThreads")
+  staffFeedbackThreads  FeedbackThread[] @relation("StaffFeedbackThreads")
+  sentFeedbackMessages  FeedbackMessage[] @relation("FeedbackMessageSender")
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+}
+
+model Child {
+  id              String       @id @default(cuid())
+  parentId        String
+  parent          User         @relation("ParentChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  fullName        String
+  birthDate       DateTime
+  gender          Gender?
+  medicalNotes    String?
+  profileImageUrl String?
+  enrollments     Enrollment[]
+  feedbackThreads FeedbackThread[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([parentId])
+}
+
+model Lesson {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  ageMin      Int
+  ageMax      Int
+  date        DateTime
+  startTime   String
+  endTime     String
+  capacity    Int
+  teacherName String
+  price       Decimal      @db.Decimal(10, 2)
+  createdBy   String
+  creator     User         @relation("LessonCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  enrollments Enrollment[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([date])
+  @@index([title])
+}
+
+model Enrollment {
+  id        String           @id @default(cuid())
+  childId   String
+  lessonId  String
+  status    EnrollmentStatus @default(BOOKED)
+  child     Child            @relation(fields: [childId], references: [id], onDelete: Cascade)
+  lesson    Lesson           @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  payments  Payment[]
+  attendance Attendance?
+  journal   JournalEntry?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([childId, lessonId])
+  @@index([lessonId])
+}
+
+model Payment {
+  id                    String        @id @default(cuid())
+  parentId              String
+  enrollmentId          String
+  amount                Decimal       @db.Decimal(10, 2)
+  currency              String        @default("usd")
+  status                PaymentStatus @default(PENDING)
+  stripePaymentIntentId String?
+  clientSecret          String?
+  parent                User          @relation("ParentPayments", fields: [parentId], references: [id], onDelete: Cascade)
+  enrollment            Enrollment    @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  @@index([parentId])
+  @@index([enrollmentId])
+}
+
+model Attendance {
+  id           String           @id @default(cuid())
+  enrollmentId String           @unique
+  markedBy     String
+  status       AttendanceStatus
+  markedAt     DateTime         @default(now())
+  comment      String?
+  enrollment   Enrollment       @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  marker       User             @relation("AttendanceMarker", fields: [markedBy], references: [id], onDelete: Restrict)
+}
+
+model Notification {
+  id        String              @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      NotificationType    @default(SYSTEM)
+  channel   NotificationChannel @default(IN_APP)
+  sentAt    DateTime            @default(now())
+  readAt    DateTime?
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, sentAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model FeedbackThread {
+  id            String            @id @default(cuid())
+  subject       String
+  parentId      String
+  staffId       String
+  childId       String?
+  lastMessageAt DateTime          @default(now())
+  parent        User              @relation("ParentFeedbackThreads", fields: [parentId], references: [id], onDelete: Cascade)
+  staff         User              @relation("StaffFeedbackThreads", fields: [staffId], references: [id], onDelete: Cascade)
+  child         Child?            @relation(fields: [childId], references: [id], onDelete: SetNull)
+  messages      FeedbackMessage[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([parentId, lastMessageAt])
+  @@index([staffId, lastMessageAt])
+  @@index([childId])
+}
+
+model FeedbackMessage {
+  id        String         @id @default(cuid())
+  threadId  String
+  senderId  String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime       @default(now())
+  thread    FeedbackThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender    User           @relation("FeedbackMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@index([senderId])
+}
+
+model JournalEntry {
+  id                  String         @id @default(cuid())
+  enrollmentId        String         @unique
+  createdBy           String
+  updatedBy           String?
+  topicSummary        String?
+  homeworkTitle       String?
+  homeworkDescription String?
+  homeworkDueDate     DateTime?
+  homeworkStatus      HomeworkStatus?
+  score               Int?
+  progressLevel       ProgressLevel?
+  teacherComment      String?
+  parentComment       String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  enrollment          Enrollment     @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  creator             User           @relation("JournalEntryCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  updater             User?          @relation("JournalEntryUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@index([homeworkDueDate])
+  @@index([progressLevel])
+}
+
+model IntegrationConnection {
+  id          String            @id @default(cuid())
+  type        IntegrationType
+  name        String
+  description String?
+  status      IntegrationStatus @default(PLANNED)
+  endpoint    String?
+  notes       String?
+  lastSyncAt  DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([type, status])
+}
