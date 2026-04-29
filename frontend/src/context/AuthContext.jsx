@@ -38,17 +38,47 @@ export function AuthProvider({ children }) {
       user,
       initialized,
       isAuthenticated: Boolean(user),
+      async loginAdmin(payload) {
+        const { data } = await api.post("/auth/admin/login", payload);
+        setTokens(data.tokens);
+        setUser(data.user);
+        return data.user;
+      },
       async login(payload) {
         const { data } = await api.post("/auth/login", payload);
         setTokens(data.tokens);
         setUser(data.user);
         return data.user;
       },
-      async register(payload) {
-        const { data } = await api.post("/auth/register", payload);
+      async requestParentCode(payload) {
+        const { data } = await api.post("/auth/parent/code/request", payload);
+        return data;
+      },
+      async verifyParentCode(payload) {
+        const { data } = await api.post("/auth/parent/code/verify", payload);
         setTokens(data.tokens);
         setUser(data.user);
-        return data.user;
+        return data;
+      },
+      async requestTeacherMagicLink(payload) {
+        const { data } = await api.post("/auth/teacher/magic-link/request", payload);
+        return data;
+      },
+      async verifyTeacherMagicLink(payload) {
+        const { data } = await api.post("/auth/teacher/magic-link/verify", payload);
+        setTokens(data.tokens);
+        setUser(data.user);
+        return data;
+      },
+      async requestTeacherCode(payload) {
+        const { data } = await api.post("/auth/teacher/code/request", payload);
+        return data;
+      },
+      async verifyTeacherCode(payload) {
+        const { data } = await api.post("/auth/teacher/code/verify", payload);
+        setTokens(data.tokens);
+        setUser(data.user);
+        return data;
       },
       async logout() {
         const refreshToken = getRefreshToken();
@@ -58,7 +88,7 @@ export function AuthProvider({ children }) {
             await api.post("/auth/logout", { refreshToken });
           }
         } catch {
-          // ignore logout failures and clear the local session anyway
+          // Ошибку logout игнорируем: локальную сессию всё равно нужно очистить.
         } finally {
           clearTokens();
           setUser(null);

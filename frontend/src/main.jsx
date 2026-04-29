@@ -10,6 +10,7 @@ import "./index.css";
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
+      {/* Провайдеры подключаются один раз на верхнем уровне, чтобы все страницы делили auth, i18n и toast-состояние. */}
       <LanguageProvider>
         <ToastProvider>
           <AuthProvider>

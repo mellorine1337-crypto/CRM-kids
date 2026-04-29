@@ -70,6 +70,20 @@ const buildScope = (user, childId) => ({
           },
         },
       }
+    : user.role === "TEACHER"
+      ? {
+          enrollment: {
+            lesson: {
+              is: {
+                OR: [
+                  { teacherId: user.id },
+                  { teacherName: user.fullName },
+                ],
+              },
+            },
+            ...(childId ? { childId } : {}),
+          },
+        }
     : childId
       ? {
           enrollment: {
@@ -142,7 +156,7 @@ router.get(
 
 router.post(
   "/",
-  requireRoles("STAFF"),
+  requireRoles("TEACHER"),
   asyncHandler(async (req, res) => {
     const data = upsertJournalSchema.parse(req.body);
     const enrollment = await prisma.enrollment.findUnique({
@@ -159,6 +173,14 @@ router.post(
 
     if (!enrollment) {
       throw { status: 404, message: "Enrollment not found" };
+    }
+
+    if (
+      req.user.role === "TEACHER" &&
+      enrollment.lesson.teacherId !== req.user.id &&
+      enrollment.lesson.teacherName !== req.user.fullName
+    ) {
+      throw { status: 403, message: "Insufficient permissions" };
     }
 
     const payload = {

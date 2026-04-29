@@ -1,10 +1,9 @@
 import { CheckCircle2, CreditCard, Download, Plus } from "lucide-react";
 import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import { Modal } from "../components/Modal.jsx";
 import { PageHeader } from "../components/PageHeader.jsx";
-import { StatCard } from "../components/StatCard.jsx";
 import { StatusBadge } from "../components/StatusBadge.jsx";
 import { StripePaymentForm } from "../components/StripePaymentForm.jsx";
 import { useAuth } from "../hooks/useAuth.js";
@@ -44,10 +43,14 @@ export function PaymentsPage() {
   const paymentsEndpoint = user.role === "PARENT" ? "/payments/my" : "/payments";
 
   const loadData = useCallback(async () => {
+    if (!["ADMIN", "PARENT"].includes(user.role)) {
+      return;
+    }
+
     try {
       const requests = [api.get(paymentsEndpoint), api.get(user.role === "PARENT" ? "/enrollments/my" : "/enrollments")];
 
-      if (user.role === "STAFF") {
+      if (user.role === "ADMIN") {
         requests.push(api.get("/children"));
       }
 
@@ -65,15 +68,19 @@ export function PaymentsPage() {
   }, [paymentsEndpoint, showToast, t, user.role]);
 
   useEffect(() => {
+    if (!["ADMIN", "PARENT"].includes(user.role)) {
+      return;
+    }
+
     const bootstrap = async () => {
       await loadData();
     };
 
     bootstrap();
-  }, [loadData]);
+  }, [loadData, user.role]);
 
   useEffect(() => {
-    if (user.role !== "STAFF" || searchParams.get("mode") !== "accept") {
+    if (user.role !== "ADMIN" || searchParams.get("mode") !== "accept") {
       return;
     }
 
@@ -117,7 +124,7 @@ export function PaymentsPage() {
   );
 
   useEffect(() => {
-    if (user.role !== "STAFF") {
+    if (user.role !== "ADMIN") {
       return;
     }
 
@@ -170,6 +177,14 @@ export function PaymentsPage() {
       }, 0),
     [payments],
   );
+  const parentTotalAccrued = parentTotalPaid + parentTotalDebt;
+  const parentPaymentProgress = parentTotalAccrued
+    ? Math.round((parentTotalPaid / parentTotalAccrued) * 100)
+    : 0;
+
+  if (!["ADMIN", "PARENT"].includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleCreatePayment = async (enrollmentId) => {
     try {
@@ -216,6 +231,53 @@ export function PaymentsPage() {
     } catch (error) {
       showToast({
         title: t("payments.confirmFailed"),
+        description: error.message,
+        tone: "error",
+      });
+    }
+  };
+
+  const handlePayAll = async () => {
+    if (!unpaidEnrollments.length) {
+      return;
+    }
+
+    try {
+      let stripeCheckout = null;
+
+      for (const enrollment of unpaidEnrollments) {
+        const { data } = await api.post("/payments/create-intent", {
+          enrollmentId: enrollment.id,
+        });
+
+        if (data.mode === "mock") {
+          await api.post(`/payments/${data.payment.id}/confirm`);
+          continue;
+        }
+
+        stripeCheckout = {
+          paymentId: data.payment.id,
+          clientSecret: data.clientSecret,
+          publishableKey:
+            data.publishableKey || import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY,
+        };
+        break;
+      }
+
+      await loadData();
+
+      if (stripeCheckout) {
+        setCheckout(stripeCheckout);
+      }
+
+      showToast({
+        title: t("payments.payAllSuccess"),
+        description: t("payments.payAllSuccessDescription"),
+        tone: "success",
+      });
+    } catch (error) {
+      showToast({
+        title: t("payments.payAllFailed"),
         description: error.message,
         tone: "error",
       });
@@ -296,39 +358,56 @@ export function PaymentsPage() {
   if (user.role === "PARENT") {
     return (
       <div className="stack-xl">
-        <PageHeader
-          title={t("payments.title")}
-          description={t("payments.parentDescription")}
-        />
+        <PageHeader title={t("payments.title")} />
 
-        <section className="grid-cards">
-          <StatCard
-            icon={CreditCard}
-            label={t("payments.parentPaid")}
-            value={formatCurrency(parentTotalPaid, "kzt", locale)}
-            tone="mint"
-          />
-          <StatCard
-            icon={CreditCard}
-            label={t("payments.parentDebt")}
-            value={formatCurrency(parentTotalDebt, "kzt", locale)}
-            tone={parentTotalDebt > 0 ? "danger" : "blue"}
-          />
-          <StatCard
-            icon={CheckCircle2}
-            label={t("payments.parentServicesWithDebt")}
-            value={unpaidEnrollments.length}
-            tone="blue"
-          />
+        <section className="panel parent-focus-panel parent-focus-panel--finance">
+          <div className="parent-section-head">
+            <h2>{t("payments.parentDebtTitle")}</h2>
+            <CreditCard size={18} />
+          </div>
+
+          <div className="parent-finance-overview">
+            <div className="parent-finance-pill">
+              <span>{t("payments.parentPaid")}</span>
+              <strong>{formatCurrency(parentTotalPaid, "kzt", locale)}</strong>
+            </div>
+            <div className="parent-finance-pill parent-finance-pill--danger">
+              <span>{t("payments.parentDebt")}</span>
+              <strong>{formatCurrency(parentTotalDebt, "kzt", locale)}</strong>
+            </div>
+          </div>
+
+          <div className="parent-progress-card">
+            <div className="parent-progress-card__head">
+              <strong>{t("payments.parentProgress")}</strong>
+              <span>
+                {formatCurrency(parentTotalPaid, "kzt", locale)} /{" "}
+                {formatCurrency(parentTotalAccrued, "kzt", locale)}
+              </span>
+            </div>
+            <div className="parent-progress">
+              <div
+                className="parent-progress__fill"
+                style={{ width: `${parentPaymentProgress}%` }}
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="button button--primary button--large"
+            onClick={handlePayAll}
+            disabled={!unpaidEnrollments.length}
+          >
+            <CreditCard size={18} />
+            {t("payments.payAll")}
+          </button>
         </section>
 
         <section className="panel panel--side">
-          <div className="staff-dashboard__section-head">
-            <div>
-              <h2>{t("payments.parentDebtTitle")}</h2>
-              <p>{t("payments.parentDebtDescription")}</p>
-            </div>
-            <CreditCard size={18} />
+          <div className="parent-section-head">
+            <h2>{t("payments.parentDebtListTitle")}</h2>
+            <CheckCircle2 size={18} />
           </div>
 
           {unpaidEnrollments.length ? (
@@ -338,18 +417,20 @@ export function PaymentsPage() {
                   <div className="parent-payment-card__copy">
                     <strong>{enrollment.lesson?.title}</strong>
                     <span>{enrollment.child?.fullName}</span>
-                    <span>
-                      {formatCurrency(enrollment.financials?.debt || 0, "kzt", locale)}
-                    </span>
                   </div>
-                  <button
-                    type="button"
-                    className="button button--primary"
-                    onClick={() => handleCreatePayment(enrollment.id)}
-                  >
-                    <CreditCard size={16} />
-                    {t("payments.payNow")}
-                  </button>
+                  <div className="parent-payment-card__actions">
+                    <strong className="parent-payment-card__amount">
+                      {formatCurrency(enrollment.financials?.debt || 0, "kzt", locale)}
+                    </strong>
+                    <button
+                      type="button"
+                      className="button button--primary"
+                      onClick={() => handleCreatePayment(enrollment.id)}
+                    >
+                      <CreditCard size={16} />
+                      {t("payments.payNow")}
+                    </button>
+                  </div>
                 </article>
               ))}
             </div>
@@ -359,11 +440,8 @@ export function PaymentsPage() {
         </section>
 
         <section className="panel panel--side">
-          <div className="staff-dashboard__section-head">
-            <div>
-              <h2>{t("payments.parentHistoryTitle")}</h2>
-              <p>{t("payments.parentHistoryDescription")}</p>
-            </div>
+          <div className="parent-section-head">
+            <h2>{t("payments.parentHistoryTitle")}</h2>
           </div>
 
           <div className="table-shell">
@@ -428,7 +506,7 @@ export function PaymentsPage() {
         title={t("payments.title")}
         description={t("payments.description")}
         action={
-          user.role === "STAFF" ? (
+          user.role === "ADMIN" ? (
             <button
               type="button"
               className="button button--primary"
@@ -441,7 +519,7 @@ export function PaymentsPage() {
         }
       />
 
-      {user.role === "STAFF" ? (
+      {user.role === "ADMIN" ? (
         <section className="two-column">
           <article className="panel stack-md">
             <div className="panel__header">
@@ -576,7 +654,7 @@ export function PaymentsPage() {
         </section>
       ) : null}
 
-      {user.role === "STAFF" ? (
+      {user.role === "ADMIN" ? (
         <section className="row-actions">
           <button
             type="button"
@@ -637,7 +715,7 @@ export function PaymentsPage() {
                           {t("payments.confirmAction")}
                         </button>
                       ) : null}
-                      {user.role === "STAFF" && Number(payment.enrollment?.financials?.debt || 0) > 0 ? (
+                      {user.role === "ADMIN" && Number(payment.enrollment?.financials?.debt || 0) > 0 ? (
                         <button
                           type="button"
                           className="button button--ghost"

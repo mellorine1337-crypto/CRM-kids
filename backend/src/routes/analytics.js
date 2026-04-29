@@ -9,7 +9,7 @@ const { serializeChild } = require("../utils/serializers");
 const router = express.Router();
 
 router.use(requireAuth);
-router.use(requireRoles("STAFF"));
+router.use(requireRoles("ADMIN"));
 
 const getMonthStart = (year, month) => new Date(year, month, 1, 0, 0, 0, 0);
 
@@ -150,7 +150,7 @@ router.get(
       }),
       prisma.user.findMany({
         where: {
-          role: "STAFF",
+          role: "TEACHER",
         },
         select: {
           id: true,

@@ -8,8 +8,14 @@ datasource db {
 }
 
 enum Role {
-  STAFF
+  ADMIN
+  TEACHER
   PARENT
+}
+
+enum AuthCodePurpose {
+  PARENT_LOGIN
+  TEACHER_LOGIN
 }
 
 enum Gender {
@@ -94,12 +100,15 @@ model User {
   role                 Role           @default(PARENT)
   children             Child[]        @relation("ParentChildren")
   createdLessons       Lesson[]       @relation("LessonCreator")
+  teachingLessons      Lesson[]       @relation("LessonTeacher")
   payments             Payment[]      @relation("ParentPayments")
   recordedPayments     Payment[]      @relation("PaymentRecorder")
   paymentHistoryEvents PaymentHistory[] @relation("PaymentHistoryActor")
   markedAttendances    Attendance[]   @relation("AttendanceMarker")
   notifications        Notification[]
   refreshTokens        RefreshToken[]
+  authCodes            AuthCode[]
+  magicLinks           MagicLinkToken[]
   createdJournalEntries JournalEntry[] @relation("JournalEntryCreator")
   updatedJournalEntries JournalEntry[] @relation("JournalEntryUpdater")
   parentFeedbackThreads FeedbackThread[] @relation("ParentFeedbackThreads")
@@ -136,16 +145,19 @@ model Lesson {
   startTime   String
   endTime     String
   capacity    Int
+  teacherId   String?
   teacherName String
   price       Decimal      @db.Decimal(10, 2)
   createdBy   String
   creator     User         @relation("LessonCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  teacher     User?        @relation("LessonTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
   enrollments Enrollment[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
   @@index([date])
   @@index([title])
+  @@index([teacherId])
 }
 
 model Enrollment {
@@ -242,6 +254,33 @@ model RefreshToken {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+model AuthCode {
+  id        String          @id @default(cuid())
+  userId     String?
+  phone     String
+  purpose   AuthCodePurpose
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime        @default(now())
+  user      User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([phone, purpose, createdAt])
+  @@index([userId])
+}
+
+model MagicLinkToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 model FeedbackThread {

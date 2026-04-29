@@ -208,7 +208,7 @@ router.get(
 
 router.get(
   "/",
-  requireRoles("STAFF"),
+  requireRoles("ADMIN"),
   asyncHandler(async (_req, res) => {
     const payments = await prisma.payment.findMany({
       include: paymentInclude,
@@ -223,7 +223,7 @@ router.get(
 
 router.get(
   "/export",
-  requireRoles("STAFF"),
+  requireRoles("ADMIN"),
   asyncHandler(async (req, res) => {
     const query = exportQuerySchema.parse(req.query);
     const { from, to } = getDateRange(query);
@@ -277,7 +277,7 @@ router.get(
 
 router.post(
   "/manual",
-  requireRoles("STAFF"),
+  requireRoles("ADMIN"),
   asyncHandler(async (req, res) => {
     const data = manualPaymentSchema.parse(req.body);
     const enrollment = await loadEnrollment(data.enrollmentId);
@@ -486,7 +486,7 @@ router.post(
         status: targetStatus,
         paidAt: payment.paidAt || new Date(),
         recordedById:
-          req.user.role === "STAFF" ? req.user.id : payment.recordedById,
+          req.user.role === "ADMIN" ? req.user.id : payment.recordedById,
       },
       include: paymentInclude,
     });

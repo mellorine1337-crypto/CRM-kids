@@ -1,7 +1,7 @@
 const express = require("express");
 const { z } = require("zod");
 const { prisma } = require("../lib/prisma");
-const { requireAuth } = require("../middleware/auth");
+const { requireAuth, requireRoles } = require("../middleware/auth");
 const { asyncHandler } = require("../utils/async-handler");
 const { serializeChild } = require("../utils/serializers");
 
@@ -19,7 +19,7 @@ const childUpdateSchema = childSchema.partial().refine((value) => Object.keys(va
   message: "At least one field must be provided",
 });
 
-router.use(requireAuth);
+router.use(requireAuth, requireRoles("ADMIN", "PARENT"));
 
 router.get(
   "/",
@@ -72,7 +72,7 @@ router.post(
       req.user.role === "PARENT" ? req.user.id : data.parentId;
 
     if (!targetParentId) {
-      throw { status: 400, message: "parentId is required for staff" };
+        throw { status: 400, message: "parentId is required for admin" };
     }
 
     const parent = await prisma.user.findUnique({

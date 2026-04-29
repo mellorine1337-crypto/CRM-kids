@@ -150,9 +150,20 @@ router.get(
 
 router.get(
   "/",
-  requireRoles("STAFF"),
-  asyncHandler(async (_req, res) => {
+  requireRoles("ADMIN", "TEACHER"),
+  asyncHandler(async (req, res) => {
     const enrollments = await prisma.enrollment.findMany({
+      where:
+        req.user.role === "TEACHER"
+          ? {
+              lesson: {
+                OR: [
+                  { teacherId: req.user.id },
+                  { teacherName: req.user.fullName },
+                ],
+              },
+            }
+          : undefined,
       include: enrollmentInclude,
       orderBy: { createdAt: "desc" },
     });

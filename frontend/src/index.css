@@ -2,8 +2,8 @@
 @import "./styles/app.css";
 
 :root {
-  color: #111827;
-  background: #f8fafc;
+  color: #333333;
+  background: #fff8f0;
   font-family: "Inter", "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -24,7 +24,7 @@ body,
 
 body {
   min-width: 1024px;
-  background: #f8fafc;
+  background: #fff8f0;
 }
 
 button,

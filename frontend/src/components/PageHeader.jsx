@@ -3,7 +3,7 @@ export function PageHeader({ title, description, action }) {
     <header className="page-header">
       <div>
         <h1>{title}</h1>
-        <p>{description}</p>
+        {description ? <p>{description}</p> : null}
       </div>
       {action ? <div className="page-header__action">{action}</div> : null}
     </header>

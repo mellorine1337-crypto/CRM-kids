@@ -1,12 +1,13 @@
 import { Html5QrcodeScanner } from "html5-qrcode";
 import {
+  CalendarDays,
   Check,
   QrCode,
   ScanLine,
   ShieldCheck,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { api } from "../api/client.js";
@@ -57,6 +58,10 @@ export function AttendancePage() {
   const [scanComment, setScanComment] = useState("");
   const [queuedQrToken, setQueuedQrToken] = useState("");
   const [lastScanResult, setLastScanResult] = useState(null);
+  const canManageAttendance = user.role === "ADMIN" || user.role === "TEACHER";
+  const hasScanModeParam =
+    canManageAttendance && searchParams.get("mode") === "scan";
+  const scannerActive = scannerEnabled || hasScanModeParam;
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -118,20 +123,20 @@ export function AttendancePage() {
   }, [selectedLessonId, showToast, t, user.role]);
 
   useEffect(() => {
-    if (user.role !== "STAFF" || searchParams.get("mode") !== "scan") {
+    if (!canManageAttendance || searchParams.get("mode") !== "scan") {
       return;
     }
 
-    setScannerEnabled(true);
+    // Параметр mode=scan позволяет открыть сканер из быстрых действий без синхронного setState внутри effect.
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
       next.delete("mode");
       return next;
     });
-  }, [searchParams, setSearchParams, user.role]);
+  }, [canManageAttendance, searchParams, setSearchParams]);
 
   useEffect(() => {
-    if (!scannerEnabled || user.role !== "STAFF") {
+    if (!scannerActive || !canManageAttendance) {
       return;
     }
 
@@ -166,7 +171,7 @@ export function AttendancePage() {
       scannerRef.current = null;
       Promise.resolve(scanner.clear()).catch(() => {});
     };
-  }, [scannerEnabled, user.role]);
+  }, [canManageAttendance, scannerActive]);
 
   useEffect(() => {
     if (!queuedQrToken) {
@@ -259,6 +264,45 @@ export function AttendancePage() {
         .sort(compareLessonDateTime),
     [enrollments],
   );
+  const parentMonthlyAttendance = useMemo(() => {
+    const now = new Date();
+    const monthlyItems = parentAttendanceItems.filter((enrollment) => {
+      const lessonDate = new Date(enrollment.lesson?.date);
+      return (
+        lessonDate.getFullYear() === now.getFullYear() &&
+        lessonDate.getMonth() === now.getMonth()
+      );
+    });
+
+    const present = monthlyItems.filter(
+      (enrollment) =>
+        enrollment.attendance?.status === "PRESENT" || enrollment.status === "ATTENDED",
+    ).length;
+    const absent = monthlyItems.filter(
+      (enrollment) =>
+        enrollment.attendance?.status === "ABSENT" || enrollment.status === "MISSED",
+    ).length;
+    const total = present + absent;
+
+    return {
+      present,
+      absent,
+      total,
+      rate: total ? Math.round((present / total) * 100) : 0,
+    };
+  }, [parentAttendanceItems]);
+  const parentUpcomingEnrollment = useMemo(
+    () =>
+      parentAttendanceItems.find(
+        (enrollment) =>
+          enrollment.status === "BOOKED" && isFutureOrTodayLesson(enrollment),
+      ) || null,
+    [parentAttendanceItems],
+  );
+  const parentRecentAttendance = useMemo(
+    () => parentAttendanceItems.slice(0, 4),
+    [parentAttendanceItems],
+  );
   const parentAttendanceStats = useMemo(
     () => ({
       present: parentAttendanceItems.filter(
@@ -346,7 +390,7 @@ export function AttendancePage() {
     }
   };
 
-  const handleLoadQrPass = async (enrollmentId) => {
+  const handleLoadQrPass = useCallback(async (enrollmentId) => {
     try {
       const { data } = await api.get(`/attendance/qr/${enrollmentId}`);
       setSelectedQrPass(data.qr);
@@ -357,7 +401,46 @@ export function AttendancePage() {
         tone: "error",
       });
     }
-  };
+  }, [showToast, t]);
+
+  useEffect(() => {
+    if (user.role !== "PARENT" || !enrollments.length) {
+      return;
+    }
+
+    const requestedEnrollmentId = searchParams.get("enrollmentId");
+    const requestedEnrollment =
+      parentAttendanceItems.find((enrollment) => enrollment.id === requestedEnrollmentId) ||
+      null;
+    const fallbackEnrollment = parentUpcomingEnrollment;
+    const targetEnrollment = requestedEnrollment || fallbackEnrollment;
+
+    const timerId = window.setTimeout(() => {
+      if (targetEnrollment) {
+        void handleLoadQrPass(targetEnrollment.id);
+      }
+
+      if (requestedEnrollmentId) {
+        setSearchParams((current) => {
+          const next = new URLSearchParams(current);
+          next.delete("enrollmentId");
+          return next;
+        });
+      }
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [
+    enrollments.length,
+    handleLoadQrPass,
+    parentAttendanceItems,
+    parentUpcomingEnrollment,
+    searchParams,
+    setSearchParams,
+    user.role,
+  ]);
 
   const handleManualScanSubmit = async (event) => {
     event.preventDefault();
@@ -372,90 +455,52 @@ export function AttendancePage() {
   if (user.role === "PARENT") {
     return (
       <div className="stack-xl">
-        <PageHeader
-          title={t("attendance.titleParent")}
-          description={t("attendance.descriptionParent")}
-        />
+        <PageHeader title={t("attendance.titleParent")} />
 
-        <section className="grid-cards">
-          <article className="stat-card stat-card--mint">
-            <div className="stat-card__icon">
-              <Check size={20} />
-            </div>
-            <div className="stat-card__body">
-              <span>{t("attendance.present")}</span>
-              <strong>{parentAttendanceStats.present}</strong>
-            </div>
-          </article>
-          <article className="stat-card stat-card--danger">
-            <div className="stat-card__icon">
-              <X size={20} />
-            </div>
-            <div className="stat-card__body">
-              <span>{t("attendance.absent")}</span>
-              <strong>{parentAttendanceStats.absent}</strong>
-            </div>
-          </article>
-          <article className="stat-card stat-card--blue">
-            <div className="stat-card__icon">
-              <CalendarDays size={20} />
-            </div>
-            <div className="stat-card__body">
-              <span>{t("attendance.parentUpcoming")}</span>
-              <strong>{parentAttendanceStats.upcoming}</strong>
-            </div>
-          </article>
-        </section>
-
-        <section className="two-column">
-          <article className="panel panel--side">
-            <div className="staff-dashboard__section-head">
-              <div>
-                <h2>{t("attendance.parentHistoryTitle")}</h2>
-                <p>{t("attendance.parentHistoryDescription")}</p>
-              </div>
+        <section className="parent-attendance-grid">
+          <article className="panel parent-attendance-summary">
+            <div className="parent-section-head">
+              <h2>{t("attendance.parentSummaryTitle")}</h2>
               <CalendarDays size={18} />
             </div>
 
-            {parentAttendanceItems.length ? (
-              <div className="stack-md">
-                {parentAttendanceItems.map((enrollment) => (
-                  <article className="parent-schedule-card" key={enrollment.id}>
-                    <div>
-                      <strong>{formatDate(enrollment.lesson?.date, locale)}</strong>
-                      <span>
-                        {enrollment.lesson?.title} • {enrollment.lesson?.startTime}
-                      </span>
-                      <span>{enrollment.child?.fullName}</span>
-                      <span>{enrollment.lesson?.teacherName}</span>
-                    </div>
-                    <div className="stack-sm">
-                      <StatusBadge status={enrollment.attendance?.status || enrollment.status} />
-                      {enrollment.status === "BOOKED" && isFutureOrTodayLesson(enrollment) ? (
-                        <button
-                          type="button"
-                          className="button button--secondary"
-                          onClick={() => handleLoadQrPass(enrollment.id)}
-                        >
-                          <QrCode size={16} />
-                          {t("attendance.showQr")}
-                        </button>
-                      ) : null}
-                    </div>
-                  </article>
-                ))}
+            <div className="parent-attendance-summary__hero">
+              <strong>{`${parentMonthlyAttendance.rate}%`}</strong>
+              <span>{t("attendance.parentMonthRate")}</span>
+            </div>
+
+            <div className="parent-progress">
+              <div
+                className="parent-progress__fill parent-progress__fill--success"
+                style={{ width: `${parentMonthlyAttendance.rate}%` }}
+              />
+            </div>
+
+            <div className="parent-attendance-summary__facts">
+              <div className="parent-finance-pill">
+                <span>{t("attendance.absent")}</span>
+                <strong>{parentMonthlyAttendance.absent}</strong>
               </div>
-            ) : (
-              <div className="empty-state">{t("attendance.noParentItems")}</div>
-            )}
+              <div className="parent-finance-pill">
+                <span>{t("attendance.parentUpcoming")}</span>
+                <strong>{parentAttendanceStats.upcoming}</strong>
+              </div>
+            </div>
+
+            <div className="parent-attendance-insight">
+              <span>{t("attendance.parentInsightLabel")}</span>
+              <strong>
+                {t("attendance.parentInsightText", {
+                  missed: parentMonthlyAttendance.absent,
+                  total: parentMonthlyAttendance.total,
+                })}
+              </strong>
+            </div>
           </article>
 
           <article className="panel panel--side">
-            <div className="staff-dashboard__section-head">
-              <div>
-                <h2>{t("attendance.qrPassTitle")}</h2>
-                <p>{t("attendance.parentQrDescription")}</p>
-              </div>
+            <div className="parent-section-head">
+              <h2>{t("attendance.qrPassTitle")}</h2>
               <ShieldCheck size={18} />
             </div>
 
@@ -472,10 +517,6 @@ export function AttendancePage() {
                   <div className="detail-card">
                     <span>{t("attendance.lesson")}</span>
                     <strong>{selectedQrPass.enrollment.lesson.title}</strong>
-                    <p>
-                      {formatDate(selectedQrPass.enrollment.lesson.date, locale)} •{" "}
-                      {selectedQrPass.enrollment.lesson.startTime}
-                    </p>
                   </div>
                   <div className="detail-card">
                     <span>{t("attendance.qrExpiresAt")}</span>
@@ -487,6 +528,41 @@ export function AttendancePage() {
               <div className="empty-state">{t("attendance.parentQrEmpty")}</div>
             )}
           </article>
+        </section>
+
+        <section className="panel panel--side">
+          <div className="parent-section-head">
+            <h2>{t("attendance.parentHistoryTitle")}</h2>
+            <button
+              type="button"
+              className="button button--secondary"
+              onClick={() =>
+                parentUpcomingEnrollment && handleLoadQrPass(parentUpcomingEnrollment.id)
+              }
+              disabled={!parentUpcomingEnrollment}
+            >
+              <QrCode size={16} />
+              {t("attendance.showQr")}
+            </button>
+          </div>
+
+          {parentRecentAttendance.length ? (
+            <div className="stack-md">
+              {parentRecentAttendance.map((enrollment) => (
+                <article className="parent-schedule-card" key={enrollment.id}>
+                  <div className="parent-schedule-card__copy">
+                    <strong>{formatDate(enrollment.lesson?.date, locale)}</strong>
+                    <span>
+                      {enrollment.lesson?.startTime} • {enrollment.child?.fullName}
+                    </span>
+                  </div>
+                  <StatusBadge status={enrollment.attendance?.status || enrollment.status} />
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">{t("attendance.noParentItems")}</div>
+          )}
         </section>
       </div>
     );
@@ -516,11 +592,11 @@ export function AttendancePage() {
               onClick={() => setScannerEnabled((value) => !value)}
             >
               <ScanLine size={16} />
-              {scannerEnabled ? t("attendance.stopScanner") : t("attendance.startScanner")}
+              {scannerActive ? t("attendance.stopScanner") : t("attendance.startScanner")}
             </button>
           </div>
 
-          {scannerEnabled ? <div id={qrReaderElementId} className="qr-scanner-shell" /> : null}
+          {scannerActive ? <div id={qrReaderElementId} className="qr-scanner-shell" /> : null}
 
           <form className="stack-md" onSubmit={handleManualScanSubmit}>
             <label className="field">

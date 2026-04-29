@@ -1,16 +1,15 @@
 import {
   AlertTriangle,
   Bell,
+  BookOpen,
   CalendarDays,
   CheckCircle2,
   Clock3,
   CreditCard,
-  QrCode,
   MessageSquareMore,
   MoveRight,
   PlusSquare,
-  Sparkles,
-  Trophy,
+  QrCode,
   UserPlus,
   Users,
   Wallet,
@@ -24,20 +23,13 @@ import { StatusBadge } from "../components/StatusBadge.jsx";
 import { useAuth } from "../hooks/useAuth.js";
 import { useI18n } from "../hooks/useI18n.js";
 import { useToast } from "../hooks/useToast.js";
-import { formatCurrency, formatDate } from "../utils/format.js";
+import { formatCurrency, formatDate, formatPercent } from "../utils/format.js";
+import { resolveNotificationPriority } from "../utils/notifications.js";
 import {
   compareLessonDateTime,
   isFutureOrTodayLesson,
   isTodayLesson,
 } from "../utils/schedule.js";
-
-const getInitials = (value = "") =>
-  value
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -71,37 +63,78 @@ export function DashboardPage() {
   useEffect(() => {
     const fetchDashboard = async () => {
       try {
-        const enrollmentEndpoint =
-          user.role === "PARENT" ? "/enrollments/my" : "/enrollments";
-        const paymentEndpoint =
-          user.role === "PARENT" ? "/payments/my" : "/payments";
-        const lessonsRequest =
-          user.role === "PARENT"
-            ? Promise.resolve({ data: { items: [] } })
-            : api.get("/lessons");
-        const recommendationsRequest =
-          user.role === "PARENT"
-            ? api.get("/recommendations")
-            : Promise.resolve({ data: { items: [] } });
-        const analyticsRequest =
-          user.role === "STAFF"
-            ? api.get("/analytics/overview")
-            : Promise.resolve({
-                data: {
-                  overview: {
-                    todayRevenue: 0,
-                    activeStudentsCount: 0,
-                    todayLessonsCount: 0,
-                    totalDebt: 0,
-                  },
-                  attendanceToday: {
-                    present: 0,
-                    expected: 0,
-                    absent: 0,
-                  },
-                  bestStaffMonth: null,
-                },
-              });
+        if (user.role === "PARENT") {
+          const [
+            childrenResponse,
+            enrollmentsResponse,
+            paymentsResponse,
+            notificationsResponse,
+            recommendationsResponse,
+          ] = await Promise.all([
+            api.get("/children"),
+            api.get("/enrollments/my"),
+            api.get("/payments/my"),
+            api.get("/notifications"),
+            api.get("/recommendations"),
+          ]);
+
+          setData({
+            children: childrenResponse.data.items,
+            lessons: [],
+            enrollments: enrollmentsResponse.data.items,
+            payments: paymentsResponse.data.items,
+            notifications: notificationsResponse.data.items,
+            recommendations: recommendationsResponse.data.items,
+          });
+          setAnalytics({
+            overview: {
+              todayRevenue: 0,
+              activeStudentsCount: 0,
+              todayLessonsCount: 0,
+              totalDebt: 0,
+            },
+            attendanceToday: {
+              present: 0,
+              expected: 0,
+              absent: 0,
+            },
+            bestStaffMonth: null,
+          });
+          return;
+        }
+
+        if (user.role === "TEACHER") {
+          const [lessonsResponse, enrollmentsResponse, notificationsResponse] =
+            await Promise.all([
+              api.get("/lessons"),
+              api.get("/enrollments"),
+              api.get("/notifications"),
+            ]);
+
+          setData({
+            children: [],
+            lessons: lessonsResponse.data.items,
+            enrollments: enrollmentsResponse.data.items,
+            payments: [],
+            notifications: notificationsResponse.data.items,
+            recommendations: [],
+          });
+          setAnalytics({
+            overview: {
+              todayRevenue: 0,
+              activeStudentsCount: 0,
+              todayLessonsCount: 0,
+              totalDebt: 0,
+            },
+            attendanceToday: {
+              present: 0,
+              expected: 0,
+              absent: 0,
+            },
+            bestStaffMonth: null,
+          });
+          return;
+        }
 
         const [
           childrenResponse,
@@ -109,16 +142,14 @@ export function DashboardPage() {
           enrollmentsResponse,
           paymentsResponse,
           notificationsResponse,
-          recommendationsResponse,
           analyticsResponse,
         ] = await Promise.all([
           api.get("/children"),
-          lessonsRequest,
-          api.get(enrollmentEndpoint),
-          api.get(paymentEndpoint),
+          api.get("/lessons"),
+          api.get("/enrollments"),
+          api.get("/payments"),
           api.get("/notifications"),
-          recommendationsRequest,
-          analyticsRequest,
+          api.get("/analytics/overview"),
         ]);
 
         setData({
@@ -127,7 +158,7 @@ export function DashboardPage() {
           enrollments: enrollmentsResponse.data.items,
           payments: paymentsResponse.data.items,
           notifications: notificationsResponse.data.items,
-          recommendations: recommendationsResponse.data.items,
+          recommendations: [],
         });
         setAnalytics(analyticsResponse.data);
       } catch (error) {
@@ -144,15 +175,37 @@ export function DashboardPage() {
     fetchDashboard();
   }, [showToast, t, user.role]);
 
-  const staffNotifications = data.notifications.slice(0, 3);
-  const staffLessons = data.lessons.slice(0, 4);
   const parentNotifications = useMemo(
-    () => data.notifications.slice(0, 4),
+    () =>
+      [...data.notifications]
+        .map((notification) => ({
+          ...notification,
+          priority: resolveNotificationPriority(notification),
+        }))
+        .sort((left, right) => {
+          const leftScore =
+            (left.readAt ? 0 : 10) +
+            (left.priority === "high" ? 3 : left.priority === "medium" ? 2 : 1);
+          const rightScore =
+            (right.readAt ? 0 : 10) +
+            (right.priority === "high" ? 3 : right.priority === "medium" ? 2 : 1);
+
+          return rightScore - leftScore;
+        })
+        .slice(0, 3),
     [data.notifications],
+  );
+  const childRecommendationMap = useMemo(
+    () =>
+      Object.fromEntries(
+        data.recommendations.map((item) => [item.child.id, item]),
+      ),
+    [data.recommendations],
   );
   const parentChildSummaries = useMemo(
     () =>
       data.children.map((child) => {
+        const recommendation = childRecommendationMap[child.id];
         const childEnrollments = data.enrollments
           .filter(
             (enrollment) =>
@@ -176,9 +229,27 @@ export function DashboardPage() {
           .filter((enrollment) => Number(enrollment.financials?.debt || 0) > 0)
           .map((enrollment) => ({
             id: enrollment.id,
+            enrollmentId: enrollment.id,
             title: enrollment.lesson?.title,
             amount: Number(enrollment.financials?.debt || 0),
           }));
+        const recordedAttendances = childEnrollments.filter(
+          (enrollment) =>
+            enrollment.attendance?.status === "PRESENT" ||
+            enrollment.attendance?.status === "ABSENT" ||
+            enrollment.status === "ATTENDED" ||
+            enrollment.status === "MISSED",
+        );
+        const attendedCount = recordedAttendances.filter(
+          (enrollment) =>
+            enrollment.attendance?.status === "PRESENT" ||
+            enrollment.status === "ATTENDED",
+        ).length;
+        const attendanceRate = recommendation?.metrics?.attendanceRate
+          ? Math.round(Number(recommendation.metrics.attendanceRate))
+          : recordedAttendances.length
+            ? Math.round((attendedCount / recordedAttendances.length) * 100)
+            : 0;
 
         return {
           child,
@@ -192,9 +263,10 @@ export function DashboardPage() {
           paid: Number(child.financials?.paid || 0),
           debt: Number(child.financials?.debt || 0),
           debtItems,
+          attendanceRate,
         };
       }),
-    [data.children, data.enrollments, locale, t],
+    [childRecommendationMap, data.children, data.enrollments, locale, t],
   );
   const parentNextEnrollment = useMemo(
     () =>
@@ -209,14 +281,6 @@ export function DashboardPage() {
         .at(0) || null,
     [data.enrollments],
   );
-  const parentAttendancePreview = useMemo(
-    () =>
-      [...data.enrollments]
-        .filter((enrollment) => enrollment.lesson && enrollment.child)
-        .sort((left, right) => compareLessonDateTime(right, left))
-        .slice(0, 5),
-    [data.enrollments],
-  );
   const parentTotals = useMemo(
     () =>
       parentChildSummaries.reduce(
@@ -229,6 +293,50 @@ export function DashboardPage() {
       ),
     [parentChildSummaries],
   );
+  const parentTodayLessonsCount = useMemo(
+    () =>
+      parentChildSummaries.filter((item) => item.todayEnrollment).length,
+    [parentChildSummaries],
+  );
+  const parentTotalAccrued = parentTotals.paid + parentTotals.debt;
+  const parentFinanceProgress = parentTotalAccrued
+    ? Math.round((parentTotals.paid / parentTotalAccrued) * 100)
+    : 0;
+  const parentMonthlyAttendance = useMemo(() => {
+    const now = new Date();
+    const monthlyItems = data.enrollments.filter((enrollment) => {
+      if (!enrollment.lesson) {
+        return false;
+      }
+
+      const lessonDate = new Date(enrollment.lesson.date);
+
+      return (
+        lessonDate.getFullYear() === now.getFullYear() &&
+        lessonDate.getMonth() === now.getMonth() &&
+        enrollment.status !== "CANCELLED"
+      );
+    });
+
+    const present = monthlyItems.filter(
+      (enrollment) =>
+        enrollment.attendance?.status === "PRESENT" ||
+        enrollment.status === "ATTENDED",
+    ).length;
+    const absent = monthlyItems.filter(
+      (enrollment) =>
+        enrollment.attendance?.status === "ABSENT" ||
+        enrollment.status === "MISSED",
+    ).length;
+    const total = present + absent;
+
+    return {
+      present,
+      absent,
+      total,
+      rate: total ? Math.round((present / total) * 100) : 0,
+    };
+  }, [data.enrollments]);
   const attendanceTodayTotal =
     analytics.attendanceToday.present +
     analytics.attendanceToday.expected +
@@ -282,66 +390,219 @@ export function DashboardPage() {
       onClick: () => navigate("/lessons?mode=create"),
     },
   ];
+  const teacherLessons = useMemo(
+    () => [...data.lessons].sort(compareLessonDateTime),
+    [data.lessons],
+  );
+  const teacherTodayLessons = useMemo(
+    () => teacherLessons.filter((lesson) => isTodayLesson(lesson)),
+    [teacherLessons],
+  );
+  const teacherUpcomingLessons = useMemo(
+    () => teacherLessons.filter((lesson) => isFutureOrTodayLesson(lesson)).slice(0, 4),
+    [teacherLessons],
+  );
+  const teacherStudentCount = useMemo(
+    () =>
+      new Set(
+        data.enrollments
+          .filter((enrollment) => enrollment.status !== "CANCELLED")
+          .map((enrollment) => enrollment.childId),
+      ).size,
+    [data.enrollments],
+  );
+  const teacherNotifications = data.notifications.slice(0, 3);
+  const teacherUnreadNotifications = useMemo(
+    () => data.notifications.filter((notification) => !notification.readAt).length,
+    [data.notifications],
+  );
+  const teacherTodayAttendance = useMemo(
+    () =>
+      data.enrollments
+        .filter(
+          (enrollment) =>
+            enrollment.lesson &&
+            enrollment.status !== "CANCELLED" &&
+            isTodayLesson(enrollment),
+        )
+        .reduce(
+          (summary, enrollment) => {
+            if (
+              enrollment.attendance?.status === "PRESENT" ||
+              enrollment.status === "ATTENDED"
+            ) {
+              summary.present += 1;
+            } else if (
+              enrollment.attendance?.status === "ABSENT" ||
+              enrollment.status === "MISSED"
+            ) {
+              summary.absent += 1;
+            } else {
+              summary.pending += 1;
+            }
 
-  if (user.role === "STAFF") {
+            return summary;
+          },
+          { present: 0, absent: 0, pending: 0 },
+        ),
+    [data.enrollments],
+  );
+  const teacherLessonCounts = useMemo(
+    () =>
+      data.enrollments.reduce((summary, enrollment) => {
+        if (enrollment.status === "CANCELLED") {
+          return summary;
+        }
+
+        summary[enrollment.lessonId] = (summary[enrollment.lessonId] || 0) + 1;
+        return summary;
+      }, {}),
+    [data.enrollments],
+  );
+
+  if (user.role === "ADMIN") {
     return (
       <div className="stack-xl">
+        <PageHeader title="Панель администратора" />
+
         <section className="grid-cards">
           <StatCard
-            icon={Wallet}
-            label={t("dashboard.revenueToday")}
-            value={formatCurrency(analytics.overview.todayRevenue, "kzt", locale)}
+            icon={Users}
+            label="Родители"
+            value={analytics.overview.parentsCount || 0}
             tone="blue"
           />
           <StatCard
             icon={Users}
-            label={t("dashboard.activeStudents")}
-            value={analytics.overview.activeStudentsCount}
+            label="Дети"
+            value={analytics.overview.childrenCount || data.children.length}
             tone="mint"
           />
           <StatCard
             icon={CalendarDays}
-            label={t("dashboard.lessonsToday")}
-            value={analytics.overview.todayLessonsCount}
+            label="Преподаватели"
+            value={analytics.teacherPerformance?.length || 0}
             tone="blue"
           />
           <StatCard
             icon={AlertTriangle}
-            label={t("dashboard.totalDebt")}
+            label="Общий долг"
             value={formatCurrency(analytics.overview.totalDebt, "kzt", locale)}
             tone="orange"
           />
+          <StatCard
+            icon={CalendarDays}
+            label="Занятия сегодня"
+            value={analytics.overview.todayLessonsCount}
+            tone="blue"
+          />
         </section>
 
-        <section className="staff-dashboard-grid">
-          <article className="panel panel--hero">
-            <div className="staff-dashboard__eyebrow">{t("dashboard.staffSummaryLabel")}</div>
-            <div className="staff-dashboard__hero-card">
-              <div className="staff-dashboard__hero-icon">
-                <CalendarDays size={28} />
+        <section className="two-column">
+          <article className="panel stack-md">
+            <div className="panel__header">
+              <div>
+                <h2>Сегодняшние занятия</h2>
               </div>
-              <div className="staff-dashboard__hero-copy">
-                <h1>{t("dashboard.staffHeroTitle")}</h1>
-                <p>{t("dashboard.staffHeroDescription")}</p>
-                <div className="staff-dashboard__hero-stats">
-                  <strong>{`${analytics.overview.todayLessonsCount} ${t("dashboard.staffLessonsCount")}`}</strong>
-                  <span />
-                  <strong>{`${analytics.overview.activeStudentsCount} ${t("dashboard.staffStudentsCount")}`}</strong>
-                  <span />
-                  <strong>{`${data.payments.length} ${t("dashboard.staffPaymentsCount")}`}</strong>
-                </div>
-              </div>
+              <CalendarDays size={18} />
             </div>
 
-            <div className="staff-dashboard__section-head">
-              <div>
-                <h2>{t("dashboard.attendanceTodayTitle")}</h2>
-                <p>{t("dashboard.attendanceTodayDescription")}</p>
+            {data.lessons.length ? (
+              data.lessons
+                .filter((lesson) => isTodayLesson(lesson))
+                .slice(0, 5)
+                .map((lesson) => (
+                  <article className="list-row" key={lesson.id}>
+                    <div>
+                      <strong>{lesson.title}</strong>
+                      <span>
+                        {lesson.startTime} - {lesson.endTime} • {lesson.teacherName}
+                      </span>
+                    </div>
+                    <StatusBadge
+                      status="BOOKED"
+                      label={`${lesson.capacity - lesson.availableSpots}/${lesson.capacity}`}
+                    />
+                  </article>
+                ))
+            ) : (
+              <div className="empty-state">{t("dashboard.noLessons")}</div>
+            )}
+          </article>
+
+          <div className="stack-lg">
+            <article className="panel stack-md">
+              <div className="panel__header">
+                <div>
+                  <h2>Быстрые действия</h2>
+                </div>
+                <CreditCard size={18} />
               </div>
-              <Link className="staff-dashboard__link" to="/attendance?mode=scan">
-                {t("dashboard.viewAll")}
-                <MoveRight size={16} />
-              </Link>
+
+              <div className="quick-actions-grid">
+                {quickActions.map((action) => {
+                  const Icon = action.icon;
+                  return (
+                    <button
+                      key={action.key}
+                      type="button"
+                      className="quick-action-card"
+                      onClick={action.onClick}
+                    >
+                      <div className="quick-action-card__icon">
+                        <Icon size={18} />
+                      </div>
+                      <strong>{action.label}</strong>
+                    </button>
+                  );
+                })}
+              </div>
+            </article>
+
+            <article className="panel stack-md">
+              <div className="panel__header">
+                <div>
+                  <h2>Уведомления</h2>
+                </div>
+                <Bell size={18} />
+              </div>
+
+              {data.notifications.slice(0, 3).length ? (
+                data.notifications.slice(0, 3).map((notification) => (
+                  <article className="staff-notification-card" key={notification.id}>
+                    <div className="staff-notification-card__head">
+                      <div className="staff-notification-card__title">
+                        <span
+                          className={
+                            notification.readAt
+                              ? "staff-notification-card__dot"
+                              : "staff-notification-card__dot staff-notification-card__dot--new"
+                          }
+                        />
+                        <strong>{notification.title}</strong>
+                      </div>
+                      <StatusBadge
+                        status={notification.readAt ? "ATTENDED" : "BOOKED"}
+                        label={notification.readAt ? t("dashboard.read") : t("dashboard.new")}
+                      />
+                    </div>
+                    <p>{notification.message}</p>
+                  </article>
+                ))
+              ) : (
+                <div className="empty-state">{t("dashboard.noNotifications")}</div>
+              )}
+            </article>
+          </div>
+        </section>
+
+        <section className="two-column">
+          <article className="panel stack-md">
+            <div className="panel__header">
+              <div>
+                <h2>Посещаемость сегодня</h2>
+              </div>
+              <CheckCircle2 size={18} />
             </div>
 
             <div className="attendance-mini-grid">
@@ -367,172 +628,40 @@ export function DashboardPage() {
                 );
               })}
             </div>
-
-            <div className="staff-dashboard__section-head">
-              <div>
-                <h2>{t("dashboard.nearestLessonsTitle")}</h2>
-                <p>{t("dashboard.staffLessonsDescription")}</p>
-              </div>
-              <Link className="staff-dashboard__link" to="/lessons">
-                {t("dashboard.viewAll")}
-                <MoveRight size={16} />
-              </Link>
-            </div>
-
-            <div className="stack-md">
-              {staffLessons.length ? (
-                staffLessons.map((lesson) => (
-                  <article className="staff-lesson-card" key={lesson.id}>
-                    <div className="staff-lesson-card__copy">
-                      <strong>{lesson.title}</strong>
-                      <span>
-                        {formatDate(lesson.date, locale)} • {lesson.startTime} - {lesson.endTime}
-                      </span>
-                      <div className="staff-lesson-card__meta">
-                        <span>{lesson.teacherName}</span>
-                        <span>{`${lesson.capacity - lesson.availableSpots}/${lesson.capacity}`}</span>
-                      </div>
-                    </div>
-                    <div className="staff-avatar-chip">
-                      <span>{getInitials(lesson.teacherName)}</span>
-                    </div>
-                  </article>
-                ))
-              ) : (
-                <div className="empty-state">{t("dashboard.noLessons")}</div>
-              )}
-            </div>
           </article>
 
-          <div className="stack-lg">
-            <article className="panel panel--side">
-              <div className="staff-dashboard__section-head">
-                <div>
-                  <h2>{t("dashboard.bestStaffTitle")}</h2>
-                  <p>{t("dashboard.bestStaffDescription")}</p>
-                </div>
-                <Trophy size={18} />
-              </div>
-
-              {analytics.bestStaffMonth ? (
-                <article className="staff-best-card">
-                  <div className="staff-best-card__avatar">
-                    <span>{getInitials(analytics.bestStaffMonth.fullName)}</span>
-                  </div>
-                  <div className="staff-best-card__body">
-                    <strong>{analytics.bestStaffMonth.fullName}</strong>
-                    <span>
-                      {t("dashboard.bestStaffRevenue")}:{" "}
-                      {formatCurrency(analytics.bestStaffMonth.revenue, "kzt", locale)}
-                    </span>
-                    <span>
-                      {t("dashboard.bestStaffStudents")}:{" "}
-                      {analytics.bestStaffMonth.activeStudentsCount}
-                    </span>
-                  </div>
-                </article>
-              ) : (
-                <div className="empty-state">{t("dashboard.bestStaffEmpty")}</div>
-              )}
-            </article>
-
-            <article className="panel panel--side">
-              <div className="staff-dashboard__section-head">
-                <div>
-                  <h2>{t("dashboard.quickActionsTitle")}</h2>
-                  <p>{t("dashboard.quickActionsDescription")}</p>
-                </div>
-                <CreditCard size={18} />
-              </div>
-
-              <div className="quick-actions-grid">
-                {quickActions.map((action) => {
-                  const Icon = action.icon;
-                  return (
-                    <button
-                      key={action.key}
-                      type="button"
-                      className="quick-action-card"
-                      onClick={action.onClick}
-                    >
-                      <div className="quick-action-card__icon">
-                        <Icon size={18} />
-                      </div>
-                      <strong>{action.label}</strong>
-                    </button>
-                  );
-                })}
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section className="two-column">
-          <article className="panel panel--side">
-            <div className="staff-dashboard__section-head">
+          <article className="panel stack-md">
+            <div className="panel__header">
               <div>
-                <h2>{t("dashboard.notificationsTitle")}</h2>
-                <p>{t("dashboard.notificationsDescription")}</p>
+                <h2>Финансы</h2>
               </div>
-              <Bell size={18} />
+              <Wallet size={18} />
             </div>
 
-            <div className="stack-md">
-              {staffNotifications.length ? (
-                staffNotifications.map((notification) => (
-                  <article className="staff-notification-card" key={notification.id}>
-                    <div className="staff-notification-card__head">
-                      <div className="staff-notification-card__title">
-                        <span
-                          className={
-                            notification.readAt
-                              ? "staff-notification-card__dot"
-                              : "staff-notification-card__dot staff-notification-card__dot--new"
-                          }
-                        />
-                        <strong>{notification.title}</strong>
-                      </div>
-                      <StatusBadge
-                        status={notification.readAt ? "ATTENDED" : "BOOKED"}
-                        label={notification.readAt ? t("dashboard.read") : t("dashboard.new")}
-                      />
-                    </div>
-                    <p>{notification.message}</p>
-                  </article>
-                ))
-              ) : (
-                <div className="empty-state">{t("dashboard.noNotifications")}</div>
-              )}
-            </div>
-
-            <Link className="staff-dashboard__link" to="/notifications">
-              {t("dashboard.viewAll")}
-              <MoveRight size={16} />
-            </Link>
-          </article>
-
-          <article className="panel panel--side">
-            <div className="staff-dashboard__section-head">
-              <div>
-                <h2>{t("dashboard.staffFinanceTitle")}</h2>
-                <p>{t("dashboard.debtSummary")}</p>
+            <div className="detail-grid">
+              <div className="detail-card">
+                <span>Выручка за сегодня</span>
+                <strong>{formatCurrency(analytics.overview.todayRevenue, "kzt", locale)}</strong>
               </div>
-              <MessageSquareMore size={18} />
+              <div className="detail-card">
+                <span>Общий долг</span>
+                <strong>{formatCurrency(analytics.overview.totalDebt, "kzt", locale)}</strong>
+              </div>
+              <div className="detail-card">
+                <span>Платежей сегодня</span>
+                <strong>{data.payments.length}</strong>
+              </div>
             </div>
 
-            <div className="staff-money-card">
-              <span>{t("dashboard.revenueToday")}</span>
-              <strong>{formatCurrency(analytics.overview.todayRevenue, "kzt", locale)}</strong>
-            </div>
-
-            <div className="staff-inline-alert staff-inline-alert--warning">
-              <span className="staff-inline-alert__dot" />
-              <strong>
-                {`${t("dashboard.totalDebt")}: ${formatCurrency(analytics.overview.totalDebt, "kzt", locale)}`}
-              </strong>
-              <Link className="staff-dashboard__link" to="/payments">
-                <MoveRight size={16} />
-              </Link>
+            <div className="row-actions">
+              <button
+                type="button"
+                className="button button--primary"
+                onClick={() => navigate("/payments")}
+              >
+                <Wallet size={16} />
+                Открыть финансы
+              </button>
             </div>
           </article>
         </section>
@@ -540,246 +669,147 @@ export function DashboardPage() {
     );
   }
 
-  return (
-    <div className="stack-xl">
-      <PageHeader
-        title={t("dashboard.welcome", {
-          name: user.fullName.split(" ")[0],
-        })}
-        description={t("dashboard.parentDescription")}
-      />
+  if (user.role === "TEACHER") {
+    return (
+      <div className="stack-xl">
+        <PageHeader title="Кабинет преподавателя" />
 
-      <section className="two-column">
-        <article className="panel panel--side">
-          <div className="staff-dashboard__section-head">
-            <div>
-              <h2>{t("dashboard.parentNextLessonTitle")}</h2>
-              <p>{t("dashboard.parentNextLessonDescription")}</p>
-            </div>
-            <CalendarDays size={18} />
-          </div>
+        <section className="grid-cards">
+          <StatCard
+            icon={CalendarDays}
+            label="Сегодня занятий"
+            value={teacherTodayLessons.length}
+            tone="blue"
+          />
+          <StatCard
+            icon={Users}
+            label="Активные ученики"
+            value={teacherStudentCount}
+            tone="mint"
+          />
+          <StatCard
+            icon={Clock3}
+            label="Ближайшие занятия"
+            value={teacherUpcomingLessons.length}
+            tone="blue"
+          />
+          <StatCard
+            icon={Bell}
+            label="Новые уведомления"
+            value={teacherUnreadNotifications}
+            tone={teacherUnreadNotifications ? "orange" : "blue"}
+          />
+        </section>
 
-          {parentNextEnrollment ? (
-            <article className="parent-hero-card">
-              <div className="parent-hero-card__eyebrow">{t("dashboard.parentNearestLabel")}</div>
-              <h2>{parentNextEnrollment.lesson?.title}</h2>
-              <div className="parent-hero-card__meta">
-                <span>{parentNextEnrollment.child?.fullName}</span>
-                <span>{formatDate(parentNextEnrollment.lesson?.date, locale)}</span>
-                <span>{`${parentNextEnrollment.lesson?.startTime} - ${parentNextEnrollment.lesson?.endTime}`}</span>
-                <span>{parentNextEnrollment.lesson?.teacherName}</span>
+        <section className="two-column">
+          <article className="panel stack-md">
+            <div className="panel__header">
+              <div>
+                <h2>Сегодня</h2>
               </div>
-              <div className="row-actions">
-                <button
-                  type="button"
-                  className="button button--primary"
-                  onClick={() => navigate("/payments")}
-                >
-                  <CreditCard size={16} />
-                  {t("dashboard.parentPayAction")}
-                </button>
-                <button
-                  type="button"
-                  className="button button--secondary"
-                  onClick={() => navigate("/lessons")}
-                >
-                  <CalendarDays size={16} />
-                  {t("dashboard.parentScheduleAction")}
-                </button>
-              </div>
-            </article>
-          ) : (
-            <div className="empty-state">{t("dashboard.parentNoLessons")}</div>
-          )}
-        </article>
-
-        <article className="panel panel--side">
-          <div className="staff-dashboard__section-head">
-            <div>
-              <h2>{t("dashboard.parentFinanceTitle")}</h2>
-              <p>{t("dashboard.parentFinanceDescription")}</p>
+              <CalendarDays size={18} />
             </div>
-            <Wallet size={18} />
-          </div>
 
-          <div className="parent-finance-summary">
-            <div className="parent-finance-pill">
-              <span>{t("dashboard.parentPaid")}</span>
-              <strong>{formatCurrency(parentTotals.paid, "kzt", locale)}</strong>
-            </div>
-            <div
-              className={
-                parentTotals.debt > 0
-                  ? "parent-finance-pill parent-finance-pill--danger"
-                  : "parent-finance-pill"
-              }
-            >
-              <span>{t("dashboard.parentDebt")}</span>
-              <strong>{formatCurrency(parentTotals.debt, "kzt", locale)}</strong>
-            </div>
-          </div>
-
-          {parentTotals.debt > 0 ? (
-            <div className="parent-debt-list">
-              {parentChildSummaries
-                .filter((item) => item.debt > 0)
-                .flatMap((item) =>
-                  item.debtItems.map((debt) => (
-                    <div className="parent-debt-list__item" key={debt.id}>
-                      <strong>{item.child.fullName}</strong>
-                      <span>{debt.title}</span>
-                      <strong>{formatCurrency(debt.amount, "kzt", locale)}</strong>
-                    </div>
-                  )),
-                )}
-            </div>
-          ) : (
-            <div className="empty-state">{t("dashboard.parentNoDebt")}</div>
-          )}
-        </article>
-      </section>
-
-      <section className="card-grid">
-        {loading ? (
-          <div className="empty-state empty-state--large">{t("dashboard.loadingChildren")}</div>
-        ) : parentChildSummaries.length ? (
-          parentChildSummaries.map((item) => (
-            <article className="parent-child-card" key={item.child.id}>
-              <div className="parent-child-card__head">
-                <div>
-                  <span className="parent-child-card__eyebrow">{t("dashboard.parentChildLabel")}</span>
-                  <h2>{item.child.fullName}</h2>
-                </div>
-                <StatusBadge
-                  status={item.debt > 0 ? "FAILED" : "SUCCEEDED"}
-                  label={
-                    item.debt > 0
-                      ? t("dashboard.parentDebtAlert")
-                      : t("dashboard.parentNoDebt")
-                  }
-                />
-              </div>
-
-              <div className="parent-child-card__facts">
-                <div className="detail-card">
-                  <span>{t("dashboard.parentCourse")}</span>
-                  <strong>{item.nextEnrollment?.lesson?.title || t("dashboard.parentNoCourse")}</strong>
-                </div>
-                <div className="detail-card">
-                  <span>{t("dashboard.parentTeacher")}</span>
-                  <strong>{item.teacherName}</strong>
-                </div>
-                <div className="detail-card">
-                  <span>{t("dashboard.parentNextLesson")}</span>
-                  <strong>{item.nextLessonLabel}</strong>
-                </div>
-                <div className="detail-card">
-                  <span>{t("dashboard.parentRemainingLessons")}</span>
-                  <strong>{item.remainingLessons}</strong>
-                  {item.todayEnrollment ? <p>{t("dashboard.parentTodayBadge")}</p> : null}
-                </div>
-              </div>
-
-              <div className="parent-child-card__finance">
-                <div className="parent-finance-pill">
-                  <span>{t("dashboard.parentPaid")}</span>
-                  <strong>{formatCurrency(item.paid, "kzt", locale)}</strong>
-                </div>
-                <div
-                  className={
-                    item.debt > 0
-                      ? "parent-finance-pill parent-finance-pill--danger"
-                      : "parent-finance-pill"
-                  }
-                >
-                  <span>{t("dashboard.parentDebt")}</span>
-                  <strong>{formatCurrency(item.debt, "kzt", locale)}</strong>
-                </div>
-              </div>
-
-              {item.debtItems.length ? (
-                <div className="parent-debt-list">
-                  {item.debtItems.map((debt) => (
-                    <div className="parent-debt-list__item" key={debt.id}>
-                      <span>{t("dashboard.parentDebtFor")}</span>
-                      <strong>{debt.title}</strong>
-                      <strong>{formatCurrency(debt.amount, "kzt", locale)}</strong>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-
-              <div className="row-actions">
-                <button
-                  type="button"
-                  className="button button--primary"
-                  onClick={() => navigate("/payments")}
-                >
-                  <CreditCard size={16} />
-                  {t("dashboard.parentPayAction")}
-                </button>
-                <button
-                  type="button"
-                  className="button button--secondary"
-                  onClick={() => navigate("/lessons")}
-                >
-                  <CalendarDays size={16} />
-                  {t("dashboard.parentScheduleAction")}
-                </button>
-              </div>
-            </article>
-          ))
-        ) : (
-          <div className="empty-state empty-state--large">{t("dashboard.parentNoChildren")}</div>
-        )}
-      </section>
-
-      <section className="two-column">
-        <article className="panel panel--side">
-          <div className="staff-dashboard__section-head">
-            <div>
-              <h2>{t("dashboard.parentAttendanceTitle")}</h2>
-              <p>{t("dashboard.parentAttendanceDescription")}</p>
-            </div>
-            <CheckCircle2 size={18} />
-          </div>
-
-          {parentAttendancePreview.length ? (
-            <div className="stack-md">
-              {parentAttendancePreview.map((enrollment) => (
-                <article className="parent-schedule-card" key={enrollment.id}>
-                  <div className="parent-schedule-card__copy">
-                    <strong>{formatDate(enrollment.lesson?.date, locale)}</strong>
+            {teacherTodayLessons.length ? (
+              teacherTodayLessons.map((lesson) => (
+                <article className="list-row" key={lesson.id}>
+                  <div>
+                    <strong>{lesson.title}</strong>
                     <span>
-                      {enrollment.child?.fullName} • {enrollment.lesson?.title}
+                      {lesson.startTime} - {lesson.endTime}
                     </span>
                   </div>
-                  <StatusBadge status={enrollment.attendance?.status || enrollment.status} />
+                  <StatusBadge
+                    status="BOOKED"
+                    label={`${teacherLessonCounts[lesson.id] || 0}/${lesson.capacity}`}
+                  />
                 </article>
-              ))}
+              ))
+            ) : (
+              <div className="empty-state">На сегодня занятий нет</div>
+            )}
+          </article>
+
+          <article className="panel stack-md">
+            <div className="panel__header">
+              <div>
+                <h2>Быстрые действия</h2>
+              </div>
+              <BookOpen size={18} />
             </div>
-          ) : (
-            <div className="empty-state">{t("dashboard.parentNoAttendance")}</div>
-          )}
 
-          <Link className="staff-dashboard__link" to="/attendance">
-            {t("dashboard.viewAll")}
-            <MoveRight size={16} />
-          </Link>
-        </article>
-
-        <article className="panel panel--side">
-          <div className="staff-dashboard__section-head">
-            <div>
-              <h2>{t("dashboard.notificationsTitle")}</h2>
-              <p>{t("dashboard.parentNotificationsDescription")}</p>
+            <div className="row-actions">
+              <button
+                type="button"
+                className="button button--primary"
+                onClick={() => navigate("/attendance?mode=scan")}
+              >
+                <QrCode size={16} />
+                Отметить посещаемость
+              </button>
+              <button
+                type="button"
+                className="button button--secondary"
+                onClick={() => navigate("/journal")}
+              >
+                <BookOpen size={16} />
+                Журнал
+              </button>
+              <button
+                type="button"
+                className="button button--secondary"
+                onClick={() => navigate("/feedback")}
+              >
+                <MessageSquareMore size={16} />
+                Сообщения
+              </button>
+              <button
+                type="button"
+                className="button button--secondary"
+                onClick={() => navigate("/lessons")}
+              >
+                <CalendarDays size={16} />
+                Расписание
+              </button>
             </div>
-            <Bell size={18} />
-          </div>
+          </article>
+        </section>
 
-          {parentNotifications.length ? (
-            <div className="stack-md">
-              {parentNotifications.map((notification) => (
+        <section className="two-column">
+          <article className="panel stack-md">
+            <div className="panel__header">
+              <div>
+                <h2>Статус посещаемости</h2>
+              </div>
+              <CheckCircle2 size={18} />
+            </div>
+
+            <div className="detail-grid">
+              <div className="detail-card">
+                <span>Были</span>
+                <strong>{teacherTodayAttendance.present}</strong>
+              </div>
+              <div className="detail-card">
+                <span>Ожидаются</span>
+                <strong>{teacherTodayAttendance.pending}</strong>
+              </div>
+              <div className="detail-card">
+                <span>Не были</span>
+                <strong>{teacherTodayAttendance.absent}</strong>
+              </div>
+            </div>
+          </article>
+
+          <article className="panel stack-md">
+            <div className="panel__header">
+              <div>
+                <h2>Уведомления</h2>
+              </div>
+              <Bell size={18} />
+            </div>
+
+            {teacherNotifications.length ? (
+              teacherNotifications.map((notification) => (
                 <article className="staff-notification-card" key={notification.id}>
                   <div className="staff-notification-card__head">
                     <div className="staff-notification-card__title">
@@ -799,17 +829,240 @@ export function DashboardPage() {
                   </div>
                   <p>{notification.message}</p>
                 </article>
-              ))}
+              ))
+            ) : (
+              <div className="empty-state">{t("dashboard.noNotifications")}</div>
+            )}
+          </article>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="stack-xl">
+      <PageHeader
+        title={t("dashboard.welcome", {
+          name: user.fullName.split(" ")[0],
+        })}
+      />
+
+      <section className="parent-summary-strip">
+        <div className="parent-summary-strip__item">
+          <span>{t("dashboard.statChildren")}</span>
+          <strong>{parentChildSummaries.length}</strong>
+        </div>
+        <div className="parent-summary-strip__item">
+          <span>{t("dashboard.parentTodayLesson")}</span>
+          <strong>{parentTodayLessonsCount}</strong>
+        </div>
+        <div className="parent-summary-strip__item parent-summary-strip__item--danger">
+          <span>{t("dashboard.parentDebt")}</span>
+          <strong>{formatCurrency(parentTotals.debt, "kzt", locale)}</strong>
+        </div>
+      </section>
+
+      <section className="parent-focus-grid">
+        <article className="panel parent-focus-panel parent-focus-panel--finance">
+          <div className="parent-section-head">
+            <h2>{t("dashboard.parentFinanceTitle")}</h2>
+            <Wallet size={18} />
+          </div>
+
+          <div className="parent-finance-overview">
+            <div className="parent-finance-pill">
+              <span>{t("dashboard.parentPaid")}</span>
+              <strong>{formatCurrency(parentTotals.paid, "kzt", locale)}</strong>
+            </div>
+            <div className="parent-finance-pill parent-finance-pill--danger">
+              <span>{t("dashboard.parentDebt")}</span>
+              <strong>{formatCurrency(parentTotals.debt, "kzt", locale)}</strong>
+            </div>
+          </div>
+
+          <div className="parent-progress-card">
+            <div className="parent-progress-card__head">
+              <strong>{t("dashboard.parentFinanceProgress")}</strong>
+              <span>
+                {formatCurrency(parentTotals.paid, "kzt", locale)} /{" "}
+                {formatCurrency(parentTotalAccrued, "kzt", locale)}
+              </span>
+            </div>
+            <div className="parent-progress">
+              <div
+                className="parent-progress__fill"
+                style={{ width: `${parentFinanceProgress}%` }}
+              />
+            </div>
+          </div>
+
+          {parentTotals.debt > 0 ? (
+            <div className="parent-debt-list">
+              {parentChildSummaries
+                .filter((item) => item.debt > 0)
+                .flatMap((item) =>
+                  item.debtItems.map((debt) => (
+                    <div className="parent-debt-list__item" key={debt.id}>
+                      <div>
+                        <strong>{debt.title}</strong>
+                        <span>{item.child.fullName}</span>
+                      </div>
+                      <strong>{formatCurrency(debt.amount, "kzt", locale)}</strong>
+                    </div>
+                  )),
+                )}
             </div>
           ) : (
-            <div className="empty-state">{t("dashboard.noNotifications")}</div>
+            <div className="parent-inline-ok">
+              <CheckCircle2 size={18} />
+              <strong>{t("dashboard.parentNoDebt")}</strong>
+            </div>
           )}
 
+          <button
+            type="button"
+            className="button button--primary button--large"
+            onClick={() => navigate("/payments")}
+          >
+            <CreditCard size={18} />
+            {t("dashboard.parentPayAllAction")}
+          </button>
+        </article>
+
+        <article className="panel parent-focus-panel">
+          <div className="parent-section-head">
+            <h2>{t("dashboard.parentNextLessonTitle")}</h2>
+            <CalendarDays size={18} />
+          </div>
+
+          {parentNextEnrollment ? (
+            <article className="parent-next-lesson">
+              <strong className="parent-next-lesson__title">
+                {parentNextEnrollment.lesson?.title}
+              </strong>
+              <div className="parent-next-lesson__meta">
+                <span>{formatDate(parentNextEnrollment.lesson?.date, locale)}</span>
+                <span>
+                  {parentNextEnrollment.lesson?.startTime} -{" "}
+                  {parentNextEnrollment.lesson?.endTime}
+                </span>
+                <span>{parentNextEnrollment.child?.fullName}</span>
+                <span>{parentNextEnrollment.lesson?.teacherName}</span>
+              </div>
+              <div className="parent-next-lesson__actions">
+                <button
+                  type="button"
+                  className="button button--secondary"
+                  onClick={() =>
+                    navigate(`/attendance?enrollmentId=${parentNextEnrollment.id}`)
+                  }
+                >
+                  <QrCode size={16} />
+                  {t("dashboard.parentQrAction")}
+                </button>
+                <button
+                  type="button"
+                  className="button button--secondary"
+                  onClick={() => navigate("/feedback")}
+                >
+                  <MessageSquareMore size={16} />
+                  {t("dashboard.parentWriteAction")}
+                </button>
+              </div>
+            </article>
+          ) : (
+            <div className="empty-state">{t("dashboard.parentNoLessons")}</div>
+          )}
+
+          <div className="parent-attendance-inline">
+            <span>{t("dashboard.parentMonthAttendance")}</span>
+            <strong>{formatPercent(parentMonthlyAttendance.rate)}</strong>
+          </div>
+        </article>
+      </section>
+
+      <section className="panel parent-children-panel">
+        <div className="parent-section-head">
+          <h2>{t("dashboard.statChildren")}</h2>
+          <Link className="staff-dashboard__link" to="/children">
+            {t("dashboard.parentOpenAllChildren")}
+            <MoveRight size={16} />
+          </Link>
+        </div>
+
+        <section className="parent-child-grid">
+        {loading ? (
+          <div className="empty-state empty-state--large">{t("dashboard.loadingChildren")}</div>
+        ) : parentChildSummaries.length ? (
+          parentChildSummaries.map((item) => (
+            <article className="parent-child-card parent-child-card--compact" key={item.child.id}>
+              <div className="parent-child-card__head">
+                <div>
+                  <h2>{item.child.fullName}</h2>
+                  <span>{item.nextLessonLabel}</span>
+                </div>
+                <StatusBadge
+                  status={item.debt > 0 ? "FAILED" : "SUCCEEDED"}
+                  label={
+                    item.debt > 0
+                      ? t("dashboard.parentDebtAlert")
+                      : t("dashboard.parentNoDebt")
+                  }
+                />
+              </div>
+
+              <div className="parent-child-card__compact-meta">
+                <span>{item.nextEnrollment?.lesson?.title || t("dashboard.parentNoCourse")}</span>
+                <span>{formatPercent(item.attendanceRate)}</span>
+              </div>
+
+              <div className="row-actions">
+                <button
+                  type="button"
+                  className="button button--secondary button--full"
+                  onClick={() => navigate("/children")}
+                >
+                  {t("dashboard.parentOpenChild")}
+                </button>
+              </div>
+            </article>
+          ))
+        ) : (
+          <div className="empty-state empty-state--large">{t("dashboard.parentNoChildren")}</div>
+        )}
+        </section>
+      </section>
+
+      <section className="panel parent-notifications-panel">
+        <div className="parent-section-head">
+          <h2>{t("dashboard.notificationsTitle")}</h2>
           <Link className="staff-dashboard__link" to="/notifications">
             {t("dashboard.viewAll")}
             <MoveRight size={16} />
           </Link>
-        </article>
+        </div>
+
+        {parentNotifications.length ? (
+          <div className="stack-md">
+            {parentNotifications.map((notification) => (
+              <article className="parent-notification-card" key={notification.id}>
+                <div className="parent-notification-card__head">
+                  <div>
+                    <strong>{notification.title}</strong>
+                    <p>{notification.message}</p>
+                  </div>
+                  <span
+                    className={`notification-priority notification-priority--${notification.priority}`}
+                  >
+                    {t(`notifications.priority${notification.priority.charAt(0).toUpperCase()}${notification.priority.slice(1)}`)}
+                  </span>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state">{t("dashboard.noNotifications")}</div>
+        )}
       </section>
     </div>
   );

@@ -2,7 +2,7 @@ const express = require("express");
 const { z } = require("zod");
 const { prisma } = require("../lib/prisma");
 const { createNotification } = require("../lib/notifications");
-const { requireAuth } = require("../middleware/auth");
+const { requireAuth, requireRoles } = require("../middleware/auth");
 const { asyncHandler } = require("../utils/async-handler");
 const {
   serializeChild,
@@ -90,6 +90,7 @@ const loadThread = async (threadId, user, include) => {
 };
 
 router.use(requireAuth);
+router.use(requireRoles("PARENT", "TEACHER"));
 
 router.get(
   "/options",
@@ -97,7 +98,7 @@ router.get(
     if (req.user.role === "PARENT") {
       const [staffUsers, children] = await Promise.all([
         prisma.user.findMany({
-          where: { role: "STAFF" },
+          where: { role: "TEACHER" },
           orderBy: { fullName: "asc" },
         }),
         prisma.child.findMany({
@@ -212,7 +213,7 @@ router.post(
       throw { status: 400, message: "Parent recipient was not found" };
     }
 
-    if (!staffUser || staffUser.role !== "STAFF") {
+    if (!staffUser || staffUser.role !== "TEACHER") {
       throw { status: 400, message: "Staff recipient was not found" };
     }
 

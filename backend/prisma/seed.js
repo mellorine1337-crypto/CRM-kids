@@ -66,6 +66,7 @@ const ensureLesson = async ({
   startTime,
   endTime,
   capacity,
+  teacherId,
   teacherName,
   price,
   createdBy,
@@ -85,6 +86,7 @@ const ensureLesson = async ({
         startTime,
         endTime,
         capacity,
+        teacherId,
         teacherName,
         price: price.toFixed(2),
         createdBy,
@@ -102,6 +104,7 @@ const ensureLesson = async ({
       startTime,
       endTime,
       capacity,
+      teacherId,
       teacherName,
       price: price.toFixed(2),
       createdBy,
@@ -358,12 +361,28 @@ async function main() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const staff = await upsertUser({
-    fullName: "Sergey Staff",
-    email: "staff@kidscrm.local",
+  const admin = await upsertUser({
+    fullName: "Ainur Admin",
+    email: "admin@kidscrm.local",
     phone: "+77001000001",
-    password: env.seed.staffPassword,
-    role: "STAFF",
+    password: env.seed.adminPassword,
+    role: "ADMIN",
+  });
+
+  const teacherIrina = await upsertUser({
+    fullName: "Irina Volkova",
+    email: "irina@kidscrm.local",
+    phone: "+77001000011",
+    password: env.seed.teacherPassword,
+    role: "TEACHER",
+  });
+
+  const teacherMaksim = await upsertUser({
+    fullName: "Maksim Lee",
+    email: "maksim@kidscrm.local",
+    phone: "+77001000012",
+    password: env.seed.teacherPassword,
+    role: "TEACHER",
   });
 
   const parent = await upsertUser({
@@ -415,9 +434,10 @@ async function main() {
     startTime: "10:00",
     endTime: "11:00",
     capacity: 12,
-    teacherName: "Irina Volkova",
+    teacherId: teacherIrina.id,
+    teacherName: teacherIrina.fullName,
     price: 5500,
-    createdBy: staff.id,
+    createdBy: admin.id,
   });
 
   const lessonTwo = await ensureLesson({
@@ -429,9 +449,10 @@ async function main() {
     startTime: "14:00",
     endTime: "15:30",
     capacity: 10,
-    teacherName: "Maksim Lee",
+    teacherId: teacherMaksim.id,
+    teacherName: teacherMaksim.fullName,
     price: 7500,
-    createdBy: staff.id,
+    createdBy: admin.id,
   });
 
   const lessonThree = await ensureLesson({
@@ -443,9 +464,10 @@ async function main() {
     startTime: "16:00",
     endTime: "17:00",
     capacity: 8,
-    teacherName: "Irina Volkova",
+    teacherId: teacherIrina.id,
+    teacherName: teacherIrina.fullName,
     price: 6200,
-    createdBy: staff.id,
+    createdBy: admin.id,
   });
 
   const lessonFour = await ensureLesson({
@@ -457,9 +479,10 @@ async function main() {
     startTime: "12:00",
     endTime: "13:00",
     capacity: 10,
-    teacherName: "Maksim Lee",
+    teacherId: teacherMaksim.id,
+    teacherName: teacherMaksim.fullName,
     price: 6800,
-    createdBy: staff.id,
+    createdBy: admin.id,
   });
 
   const lessonFive = await ensureLesson({
@@ -471,9 +494,10 @@ async function main() {
     startTime: "15:00",
     endTime: "16:30",
     capacity: 10,
-    teacherName: "Maksim Lee",
+    teacherId: teacherMaksim.id,
+    teacherName: teacherMaksim.fullName,
     price: 7600,
-    createdBy: staff.id,
+    createdBy: admin.id,
   });
 
   const enrollmentOne = await prisma.enrollment.upsert({
@@ -569,7 +593,7 @@ async function main() {
     method: "TERMINAL",
     serviceLabel: lessonOne.title,
     comment: "Оплата на ресепшене через терминал",
-    recordedById: staff.id,
+    recordedById: admin.id,
     paidAt: atTime(today, 9, 20),
     historyComment: "Создана и подтверждена оплата через терминал",
   });
@@ -582,7 +606,7 @@ async function main() {
     method: "BANK_TRANSFER",
     serviceLabel: lessonThree.title,
     comment: "Перевод от родителя по реквизитам центра",
-    recordedById: staff.id,
+    recordedById: admin.id,
     paidAt: atTime(addDays(today, -5), 18, 10),
     historyComment: "Оплата подтверждена переводом",
   });
@@ -595,7 +619,7 @@ async function main() {
     method: "CASH",
     serviceLabel: lessonTwo.title,
     comment: "Частичная оплата наличными",
-    recordedById: staff.id,
+    recordedById: admin.id,
     paidAt: atTime(today, 11, 10),
     historyComment: "Зафиксирована частичная оплата",
   });
@@ -608,7 +632,7 @@ async function main() {
     method: "QR",
     serviceLabel: lessonTwo.title,
     comment: "Ожидается подтверждение оплаты по QR",
-    recordedById: staff.id,
+    recordedById: admin.id,
     paidAt: null,
     historyComment: "Создан ожидающий платёж по QR",
   });
@@ -621,14 +645,14 @@ async function main() {
     method: "TERMINAL",
     serviceLabel: lessonFive.title,
     comment: "Полная оплата следующего занятия",
-    recordedById: staff.id,
+    recordedById: admin.id,
     paidAt: atTime(addDays(today, -1), 17, 0),
     historyComment: "Полная оплата подтверждена",
   });
 
   await ensureAttendance({
     enrollmentId: enrollmentTwo.id,
-    markedBy: staff.id,
+    markedBy: teacherIrina.id,
     status: "PRESENT",
     comment: "Отличная вовлечённость на уроке",
     markedAt: atTime(addDays(today, -6), 17, 5),
@@ -636,7 +660,7 @@ async function main() {
 
   await ensureAttendance({
     enrollmentId: enrollmentFour.id,
-    markedBy: staff.id,
+    markedBy: teacherMaksim.id,
     status: "ABSENT",
     comment: "Пропуск без предупреждения",
     markedAt: atTime(addDays(today, -10), 13, 10),
@@ -644,7 +668,7 @@ async function main() {
 
   await ensureAttendance({
     enrollmentId: enrollmentFive.id,
-    markedBy: staff.id,
+    markedBy: teacherMaksim.id,
     status: "PRESENT",
     comment: "Уверенное участие на всём занятии",
     markedAt: atTime(addDays(today, -1), 15, 35),
@@ -652,8 +676,8 @@ async function main() {
 
   await ensureJournalEntry({
     enrollmentId: enrollmentTwo.id,
-    createdBy: staff.id,
-    updatedBy: staff.id,
+    createdBy: teacherIrina.id,
+    updatedBy: teacherIrina.id,
     topicSummary: "Отрабатывали чтение коротких текстов и пересказ по ключевым словам.",
     homeworkTitle: "Прочитать рассказ и выписать новые слова",
     homeworkDescription:
@@ -668,8 +692,8 @@ async function main() {
 
   await ensureJournalEntry({
     enrollmentId: enrollmentFour.id,
-    createdBy: staff.id,
-    updatedBy: staff.id,
+    createdBy: teacherMaksim.id,
+    updatedBy: teacherMaksim.id,
     topicSummary: "Разбирали логические цепочки, устный счёт и задачи на внимание.",
     homeworkTitle: "Карточки на счёт и логические пары",
     homeworkDescription:
@@ -685,8 +709,8 @@ async function main() {
 
   await ensureJournalEntry({
     enrollmentId: enrollmentFive.id,
-    createdBy: staff.id,
-    updatedBy: staff.id,
+    createdBy: teacherMaksim.id,
+    updatedBy: teacherMaksim.id,
     topicSummary: "Собирали простую модель и учились программировать последовательность действий.",
     homeworkTitle: "Собрать мини-проект по инструкции",
     homeworkDescription:
@@ -741,7 +765,7 @@ async function main() {
   await ensureFeedbackThread({
     subject: "Обратная связь по занятию",
     parentId: parent.id,
-    staffId: staff.id,
+    staffId: teacherMaksim.id,
     childId: childOne.id,
     messages: [
       {
@@ -749,14 +773,16 @@ async function main() {
         body: "Подскажите, пожалуйста, можно ли добавить больше творческих заданий домой после занятия?",
       },
       {
-        senderId: staff.id,
+        senderId: teacherMaksim.id,
         body: "Да, конечно. Мы подготовим дополнительные материалы и отправим рекомендации после следующего урока.",
       },
     ],
   });
 
   console.log("Seed завершён:");
-  console.log("STAFF  staff@kidscrm.local  ", env.seed.staffPassword);
+  console.log("ADMIN  admin@kidscrm.local   ", env.seed.adminPassword);
+  console.log("TEACHER irina@kidscrm.local  ", env.seed.teacherPassword);
+  console.log("TEACHER maksim@kidscrm.local ", env.seed.teacherPassword);
   console.log("PARENT parent@kidscrm.local ", env.seed.parentPassword);
   console.log("PARENT parent2@kidscrm.local", env.seed.parentPassword);
   console.log(

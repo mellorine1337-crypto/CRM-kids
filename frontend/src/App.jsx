@@ -1,5 +1,4 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { LanguageSwitcher } from "./components/LanguageSwitcher.jsx";
 import { ProtectedRoute } from "./components/ProtectedRoute.jsx";
 import { DashboardLayout } from "./layouts/DashboardLayout.jsx";
 import { AttendancePage } from "./pages/AttendancePage.jsx";
@@ -19,35 +18,32 @@ import { SettingsPage } from "./pages/SettingsPage.jsx";
 
 function App() {
   return (
-    <>
-      <LanguageSwitcher />
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<DashboardPage />} />
-          <Route path="analytics" element={<AnalyticsPage />} />
-          <Route path="journal" element={<JournalPage />} />
-          <Route path="recommendations" element={<RecommendationsPage />} />
-          <Route path="children" element={<ChildrenPage />} />
-          <Route path="lessons" element={<LessonsPage />} />
-          <Route path="enrollments" element={<EnrollmentsPage />} />
-          <Route path="attendance" element={<AttendancePage />} />
-          <Route path="payments" element={<PaymentsPage />} />
-          <Route path="feedback" element={<FeedbackPage />} />
-          <Route path="notifications" element={<NotificationsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="integrations" element={<IntegrationsPage />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <DashboardLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<DashboardPage />} />
+        <Route path="analytics" element={<AnalyticsPage />} />
+        <Route path="journal" element={<JournalPage />} />
+        <Route path="recommendations" element={<RecommendationsPage />} />
+        <Route path="children" element={<ChildrenPage />} />
+        <Route path="lessons" element={<LessonsPage />} />
+        <Route path="enrollments" element={<EnrollmentsPage />} />
+        <Route path="attendance" element={<AttendancePage />} />
+        <Route path="payments" element={<PaymentsPage />} />
+        <Route path="feedback" element={<FeedbackPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="integrations" element={<IntegrationsPage />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 

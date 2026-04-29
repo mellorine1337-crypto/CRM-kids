@@ -1,50 +1,50 @@
-# Architecture Notes
+# Архитектурные заметки
 
-The target product is an education-center platform focused on effective learning for children and transparent interaction between staff and parents. The full concept combines a public course website, an attendance/progress journal and a CRM workspace. This repository covers the CRM MVP plus attendance workflows and is structured so the website and richer journal features can be added later.
+Целевой продукт представляет собой платформу для образовательного центра, ориентированную на эффективное обучение детей и прозрачное взаимодействие между сотрудниками и родителями. Полная концепция объединяет публичный сайт курсов, журнал посещаемости и прогресса, а также CRM-рабочее пространство. Этот репозиторий покрывает CRM MVP и процессы, связанные с посещаемостью, и изначально устроен так, чтобы позже можно было добавить сайт и более богатый учебный журнал.
 
-## 1. Monorepo layout
+## 1. Структура монорепозитория
 
-The repository is split into two isolated apps:
+Репозиторий разделён на два независимых приложения:
 
-- `backend`: REST API and database access
-- `frontend`: React single-page application
+- `backend`: REST API и работа с базой данных
+- `frontend`: одностраничное приложение на React
 
-Root `package.json` orchestrates workspace scripts for local development.
+Корневой `package.json` управляет workspace-скриптами для локальной разработки.
 
-## 2. Backend design
+## 2. Архитектура backend
 
-### Stack
+### Стек
 
 - Express 5
 - Prisma ORM
 - PostgreSQL
-- JWT auth with refresh token rotation
-- Swagger UI from `backend/docs/openapi.yaml`
+- JWT-аутентификация с ротацией refresh token
+- Swagger UI из `backend/docs/openapi.yaml`
 
-### Main modules
+### Основные модули
 
-- `auth`: register, login, refresh, logout
-- `users`: current profile read/update
-- `children`: parent-owned student profiles
-- `analytics`: center-level KPI dashboard for staff
-- `lessons`: schedule and course-session CRUD with filtering
-- `enrollments`: booking flow with capacity and age validation
-- `payments`: payment intent creation and confirmation
-- `attendance`: attendance journal for staff and parent visibility
-- `feedback`: two-way discussion threads between parent and staff
-- `notifications`: in-app notification feed
-- `uploads`: local file storage for child avatars
+- `auth`: регистрация, логин, refresh, logout
+- `users`: чтение и обновление текущего профиля
+- `children`: карточки детей, принадлежащих родителю
+- `analytics`: KPI-панель центра для сотрудников
+- `lessons`: CRUD занятий и фильтрация расписания
+- `enrollments`: запись на занятия с проверкой возраста и вместимости
+- `payments`: создание и подтверждение оплаты
+- `attendance`: журнал посещаемости для сотрудников и видимость для родителей
+- `feedback`: двусторонняя переписка между родителем и сотрудником
+- `notifications`: in-app лента уведомлений
+- `uploads`: локальное хранение фото детей
 
-### Security model
+### Модель безопасности
 
-- access tokens are sent as `Bearer` tokens
-- refresh tokens are persisted in the database as SHA-256 hashes
-- route access is guarded by `requireAuth` and `requireRoles`
-- parent users are restricted to their own children, enrollments and payments
+- access token передаётся как `Bearer` token
+- refresh token хранится в базе в виде SHA-256 hash
+- доступ к маршрутам ограничивается через `requireAuth` и `requireRoles`
+- родитель может работать только со своими детьми, записями и оплатами
 
-### Persistence
+### Хранение данных
 
-Prisma models cover:
+Prisma-модели покрывают:
 
 - `User`
 - `Child`
@@ -57,69 +57,69 @@ Prisma models cover:
 - `Notification`
 - `RefreshToken`
 
-## 3. Frontend design
+## 3. Архитектура frontend
 
-### Stack
+### Стек
 
 - React 19
 - React Router
-- Axios with automatic access-token refresh
-- Context API for auth and toast state
+- Axios с автоматическим обновлением access token
+- Context API для auth и toast-состояния
 
-### UI structure
+### UI-структура
 
-- login/register page
-- protected dashboard shell with sidebar
-- staff analytics dashboard
-- CRUD pages for children and lessons
-- enrollment table
-- payments page with mock or Stripe flow
-- attendance journal
-- feedback page with threaded parent/staff discussion
-- notifications feed
-- settings page
+- страница логина и регистрации
+- защищённая dashboard-оболочка с sidebar
+- аналитическая панель для сотрудника
+- CRUD-страницы для детей и занятий
+- таблица записей на занятия
+- страница оплат с mock/Stripe flow
+- журнал посещаемости
+- страница обратной связи с диалогом родитель/сотрудник
+- лента уведомлений
+- страница настроек
 
-The current UI acts as the internal CRM workspace. A public marketing/course website can be added as a separate frontend that consumes the same API.
+Текущий UI работает как внутреннее CRM-пространство. Публичный маркетинговый сайт и каталог курсов можно позже вынести в отдельный frontend, использующий тот же API.
 
-### State strategy
+### Стратегия состояния
 
-- authentication state is held in `AuthProvider`
-- toast notifications are held in `ToastProvider`
-- page data is fetched per route from the REST API
-- access and refresh tokens are stored in `localStorage`
+- состояние аутентификации хранится в `AuthProvider`
+- toast-уведомления хранятся в `ToastProvider`
+- данные страниц загружаются на уровне конкретного route из REST API
+- access и refresh token хранятся в `localStorage`
 
-## 4. Payment flow
+## 4. Поток оплаты
 
-### Mock mode
+### Mock-режим
 
-When Stripe keys are missing:
+Если Stripe-ключи отсутствуют:
 
-1. backend creates a mock payment record
-2. frontend immediately calls confirm
-3. payment becomes `SUCCEEDED`
+1. backend создаёт mock-запись оплаты
+2. frontend сразу вызывает подтверждение
+3. платёж получает статус `SUCCEEDED`
 
-### Stripe mode
+### Stripe-режим
 
-When Stripe keys are configured:
+Если Stripe-ключи настроены:
 
-1. backend creates a Stripe `PaymentIntent`
-2. frontend opens Stripe Elements
-3. frontend confirms payment using Stripe.js
-4. backend verifies the intent and marks the payment as `SUCCEEDED`
+1. backend создаёт Stripe `PaymentIntent`
+2. frontend открывает Stripe Elements
+3. frontend подтверждает оплату через Stripe.js
+4. backend проверяет intent и переводит платёж в `SUCCEEDED`
 
-## 5. Notifications
+## 5. Уведомления
 
-Notifications are stored in the database for in-app display.
-If email settings exist, the same events can also be sent through SMTP.
-In development, `nodemailer` falls back to a JSON transport.
+Уведомления хранятся в базе данных для показа внутри приложения.
+Если настроен email, эти же события могут отправляться через SMTP.
+В разработке `nodemailer` использует JSON transport как fallback.
 
-## 6. Scalability notes
+## 6. Масштабирование
 
-The current MVP is intentionally simple, but prepared for extension:
+Текущий MVP специально сделан достаточно простым, но подготовлен к расширению:
 
-- uploads can be moved from local disk to S3 or GCS
-- notifications can be extended to FCM push delivery
-- dashboard metrics can move into dedicated summary endpoints
-- audit logging and QR attendance can be added without changing the core role model
-- assignments, teacher remarks and parent feedback can be added on top of the current lesson and notification flows
-- the public course catalog and landing pages can be split into a dedicated website app without replacing the CRM backend
+- локальные uploads можно перенести в S3 или GCS
+- уведомления можно расширить до push-доставки через FCM
+- dashboard-метрики можно вынести в отдельные summary endpoint-ы
+- аудит действий и QR-посещаемость можно наращивать без смены базовой ролевой модели
+- задания, комментарии преподавателя и обратную связь родителей можно строить поверх уже существующих lesson и notification flow
+- публичный каталог курсов и landing pages можно вынести в отдельное website-приложение без замены CRM backend

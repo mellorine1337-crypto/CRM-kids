@@ -1,5 +1,6 @@
 import { MessageSquare, SendHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { api } from "../api/client.js";
 import { PageHeader } from "../components/PageHeader.jsx";
 import { useAuth } from "../hooks/useAuth.js";
@@ -78,6 +79,10 @@ export function FeedbackPage() {
   };
 
   useEffect(() => {
+    if (!["PARENT", "TEACHER"].includes(user.role)) {
+      return;
+    }
+
     const bootstrap = async () => {
       try {
         const [optionsResponse, threadsResponse] = await Promise.all([
@@ -98,7 +103,7 @@ export function FeedbackPage() {
             (user.role === "PARENT" ? optionsResponse.data.staff[0]?.id || "" : ""),
           parentId:
             current.parentId ||
-            (user.role === "STAFF" ? optionsResponse.data.parents[0]?.id || "" : ""),
+            (user.role === "TEACHER" ? optionsResponse.data.parents[0]?.id || "" : ""),
         }));
 
         if (nextThreadId) {
@@ -151,7 +156,7 @@ export function FeedbackPage() {
       setComposeForm((current) => ({
         ...defaultComposeState,
         staffId: user.role === "PARENT" ? current.staffId : "",
-        parentId: user.role === "STAFF" ? current.parentId : "",
+        parentId: user.role === "TEACHER" ? current.parentId : "",
       }));
       setReplyBody("");
       setSelectedThread(data.thread);
@@ -203,6 +208,10 @@ export function FeedbackPage() {
   };
 
   const getCounterparty = (thread) => (user.role === "PARENT" ? thread.staff : thread.parent);
+
+  if (!["PARENT", "TEACHER"].includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
 
   return (
     <div className="stack-xl">

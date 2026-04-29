@@ -1,5 +1,6 @@
 import { BookOpen, MessageSquareMore, Save } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { api } from "../api/client.js";
 import { PageHeader } from "../components/PageHeader.jsx";
 import { StatusBadge } from "../components/StatusBadge.jsx";
@@ -57,7 +58,7 @@ export function JournalPage() {
       try {
         const [journalResponse, enrollmentResponse] = await Promise.all([
           api.get("/journal"),
-          user.role === "STAFF"
+          user.role === "TEACHER"
             ? api.get("/enrollments")
             : Promise.resolve({ data: { items: [] } }),
         ]);
@@ -200,6 +201,10 @@ export function JournalPage() {
     }
   };
 
+  if (!["TEACHER", "PARENT"].includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <div className="stack-xl">
       <PageHeader title={t("journal.title")} description={t("journal.description")} />
@@ -306,7 +311,7 @@ export function JournalPage() {
             </article>
           ) : null}
 
-          {user.role === "STAFF" ? (
+          {user.role === "TEACHER" ? (
             <article className="panel">
               <div className="panel__header">
                 <div>

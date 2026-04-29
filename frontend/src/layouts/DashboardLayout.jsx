@@ -9,6 +9,7 @@ import {
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
+import { LanguageSwitcher } from "../components/LanguageSwitcher.jsx";
 import { navigationItems } from "../data/navigation.js";
 import { useAuth } from "../hooks/useAuth.js";
 import { useI18n } from "../hooks/useI18n.js";
@@ -22,7 +23,8 @@ export function DashboardLayout() {
   const [searchValue, setSearchValue] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
   const navItems = navigationItems.filter((item) => item.roles.includes(user.role));
-  const isStaffShell = user.role === "STAFF";
+  const isStaffShell = user.role !== "PARENT";
+  // currentItem нужен и для подписи текущего раздела у родителя, и для синхронизации active-состояния sidebar с маршрутом.
   const currentItem = navItems.find((item) =>
     item.to === "/" ? location.pathname === "/" : location.pathname.startsWith(item.to),
   );
@@ -105,6 +107,7 @@ export function DashboardLayout() {
         <header className={isStaffShell ? "topbar topbar--staff" : "topbar"}>
           {isStaffShell ? (
             <>
+              {/* Для сотрудника здесь более операционный shell: поиск, быстрые действия и счётчик непрочитанных уведомлений. */}
               <div className="topbar__search">
                 <Search size={18} />
                 <input
@@ -115,6 +118,7 @@ export function DashboardLayout() {
                 />
               </div>
               <div className="topbar__actions">
+                <LanguageSwitcher />
                 <button
                   type="button"
                   className="topbar__icon-button"
@@ -153,13 +157,17 @@ export function DashboardLayout() {
             </>
           ) : (
             <>
+              {/* Родительский режим специально упрощён: только название текущего раздела и бейдж роли. */}
               <div>
                 <span className="eyebrow">{t("topbar.currentView")}</span>
                 <strong>{currentItem ? t(currentItem.labelKey) : t("navigation.dashboard")}</strong>
               </div>
-              <div className="topbar__pill">
-                <MenuSquare size={16} />
-                <span>{formatRole(user.role, locale)}</span>
+              <div className="topbar__actions">
+                <LanguageSwitcher />
+                <div className="topbar__pill">
+                  <MenuSquare size={16} />
+                  <span>{formatRole(user.role, locale)}</span>
+                </div>
               </div>
             </>
           )}

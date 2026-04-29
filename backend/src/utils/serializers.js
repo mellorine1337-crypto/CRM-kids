@@ -4,6 +4,7 @@ const {
   buildEnrollmentFinancials,
 } = require("../lib/finance");
 
+// Сериализаторы стабилизируют REST-ответы и не дают маршрутам отдавать во frontend сырые Prisma-объекты.
 const serializeUser = (user) => ({
   id: user.id,
   fullName: user.fullName,
@@ -43,6 +44,7 @@ const serializeLesson = (lesson) => {
     startTime: lesson.startTime,
     endTime: lesson.endTime,
     capacity: lesson.capacity,
+    teacherId: lesson.teacherId,
     teacherName: lesson.teacherName,
     price: Number(lesson.price),
     createdBy: lesson.createdBy,

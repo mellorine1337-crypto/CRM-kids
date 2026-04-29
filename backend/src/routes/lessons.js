@@ -17,6 +17,7 @@ const lessonBaseSchema = z.object({
   startTime: z.string().min(4).max(10),
   endTime: z.string().min(4).max(10),
   capacity: z.coerce.number().int().min(1).max(500),
+  teacherId: z.string().optional().nullable(),
   teacherName: z.string().min(2).max(120),
   price: z.coerce.number().min(0),
 });
@@ -54,6 +55,13 @@ router.get(
     const { date, age, title } = req.query;
     const where = {};
 
+    if (req.user.role === "TEACHER") {
+      where.OR = [
+        { teacherId: req.user.id },
+        { teacherName: req.user.fullName },
+      ];
+    }
+
     if (title) {
       where.title = { contains: String(title), mode: "insensitive" };
     }
@@ -76,6 +84,7 @@ router.get(
       where,
       include: {
         creator: true,
+        teacher: true,
         enrollments: { select: { status: true } },
       },
       orderBy: [{ date: "asc" }, { startTime: "asc" }],
@@ -89,9 +98,22 @@ router.get(
 
 router.post(
   "/",
-  requireRoles("STAFF"),
+  requireRoles("ADMIN"),
   asyncHandler(async (req, res) => {
     const data = lessonSchema.parse(req.body);
+    let teacherName = data.teacherName;
+
+    if (data.teacherId) {
+      const teacher = await prisma.user.findUnique({
+        where: { id: data.teacherId },
+      });
+
+      if (!teacher || teacher.role !== "TEACHER") {
+        throw { status: 400, message: "User not found" };
+      }
+
+      teacherName = teacher.fullName;
+    }
 
     const lesson = await prisma.lesson.create({
       data: {
@@ -103,12 +125,14 @@ router.post(
         startTime: data.startTime,
         endTime: data.endTime,
         capacity: data.capacity,
-        teacherName: data.teacherName,
+        teacherId: data.teacherId || null,
+        teacherName,
         price: data.price.toFixed(2),
         createdBy: req.user.id,
       },
       include: {
         creator: true,
+        teacher: true,
         enrollments: { select: { status: true } },
       },
     });
@@ -121,19 +145,34 @@ router.post(
 
 router.patch(
   "/:id",
-  requireRoles("STAFF"),
+  requireRoles("ADMIN"),
   asyncHandler(async (req, res) => {
     const data = lessonUpdateSchema.parse(req.body);
     const lesson = await prisma.lesson.findUnique({
       where: { id: req.params.id },
       include: {
         creator: true,
+        teacher: true,
         enrollments: { select: { status: true } },
       },
     });
 
     if (!lesson) {
       throw { status: 404, message: "Lesson not found" };
+    }
+
+    let teacherName = data.teacherName;
+
+    if (data.teacherId) {
+      const teacher = await prisma.user.findUnique({
+        where: { id: data.teacherId },
+      });
+
+      if (!teacher || teacher.role !== "TEACHER") {
+        throw { status: 400, message: "User not found" };
+      }
+
+      teacherName = teacher.fullName;
     }
 
     const updatedLesson = await prisma.lesson.update({
@@ -147,11 +186,13 @@ router.patch(
         startTime: data.startTime,
         endTime: data.endTime,
         capacity: data.capacity,
-        teacherName: data.teacherName,
+        teacherId: data.teacherId !== undefined ? data.teacherId || null : undefined,
+        teacherName: teacherName || undefined,
         price: data.price !== undefined ? data.price.toFixed(2) : undefined,
       },
       include: {
         creator: true,
+        teacher: true,
         enrollments: { select: { status: true } },
       },
     });
@@ -164,7 +205,7 @@ router.patch(
 
 router.delete(
   "/:id",
-  requireRoles("STAFF"),
+  requireRoles("ADMIN"),
   asyncHandler(async (req, res) => {
     const lesson = await prisma.lesson.findUnique({
       where: { id: req.params.id },

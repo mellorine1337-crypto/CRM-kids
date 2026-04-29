@@ -1,6 +1,6 @@
 import { Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import { Modal } from "../components/Modal.jsx";
 import { PageHeader } from "../components/PageHeader.jsx";
@@ -37,7 +37,7 @@ export function ChildrenPage() {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [onlyDebtors, setOnlyDebtors] = useState(false);
-  const canCreate = true;
+  const canManage = user.role === "ADMIN";
 
   const loadChildren = async () => {
     try {
@@ -55,11 +55,15 @@ export function ChildrenPage() {
   };
 
   useEffect(() => {
+    if (user.role === "TEACHER") {
+      return;
+    }
+
     const bootstrap = async () => {
       try {
         const requests = [api.get("/children")];
 
-        if (user.role === "STAFF") {
+        if (user.role === "ADMIN") {
           requests.push(api.get("/users/parents"));
         }
 
@@ -81,23 +85,31 @@ export function ChildrenPage() {
   }, [showToast, t, user.role]);
 
   useEffect(() => {
-    if (searchParams.get("mode") !== "create") {
+    if (searchParams.get("mode") !== "create" || !canManage) {
       return;
     }
 
-    setEditingChild(null);
-    setForm({
-      ...emptyForm,
-      parentId: user.role === "STAFF" ? parents[0]?.id || "" : "",
-    });
-    setFile(null);
-    setModalOpen(true);
+    // Открытие модалки переносится в следующую задачу event loop, чтобы React не считал этот effect каскадным перерендером.
+    const timerId = window.setTimeout(() => {
+      setEditingChild(null);
+      setForm({
+        ...emptyForm,
+        parentId: user.role === "ADMIN" ? parents[0]?.id || "" : "",
+      });
+      setFile(null);
+      setModalOpen(true);
+    }, 0);
+
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
       next.delete("mode");
       return next;
     });
-  }, [parents, searchParams, setSearchParams, user.role]);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [canManage, parents, searchParams, setSearchParams, user.role]);
 
   const resetModal = () => {
     setEditingChild(null);
@@ -110,7 +122,7 @@ export function ChildrenPage() {
     setEditingChild(null);
     setForm({
       ...emptyForm,
-      parentId: user.role === "STAFF" ? parents[0]?.id || "" : "",
+      parentId: user.role === "ADMIN" ? parents[0]?.id || "" : "",
     });
     setFile(null);
     setModalOpen(true);
@@ -152,7 +164,7 @@ export function ChildrenPage() {
     event.preventDefault();
 
     try {
-      if (user.role === "STAFF" && !form.parentId) {
+      if (user.role === "ADMIN" && !form.parentId) {
         showToast({
           title: t("children.saveFailed"),
           description: t("children.parentRequired"),
@@ -162,7 +174,7 @@ export function ChildrenPage() {
       }
 
       const payload = {
-        parentId: user.role === "STAFF" ? form.parentId : undefined,
+        parentId: user.role === "ADMIN" ? form.parentId : undefined,
         fullName: form.fullName,
         birthDate: new Date(form.birthDate).toISOString(),
         gender: form.gender || undefined,
@@ -218,13 +230,17 @@ export function ChildrenPage() {
     ? children.filter((child) => Number(child.financials?.debt || 0) > 0)
     : children;
 
+  if (user.role === "TEACHER") {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <div className="stack-xl">
       <PageHeader
         title={t("children.title")}
         description={t("children.description")}
         action={
-          canCreate ? (
+          canManage ? (
             <button
               type="button"
               className="button button--primary"
@@ -313,27 +329,37 @@ export function ChildrenPage() {
                   </div>
                 </div>
                 <div className="row-actions">
-                  <button
-                    type="button"
-                    className="button button--secondary"
-                    onClick={() => openEdit(child)}
-                  >
-                    <Pencil size={16} />
-                    {t("common.edit")}
-                  </button>
-                  <button
-                    type="button"
-                    className="button button--ghost"
-                    onClick={() => handleDelete(child)}
-                  >
-                    <Trash2 size={16} />
-                    {t("common.delete")}
-                  </button>
+                  {canManage ? (
+                    <>
+                      <button
+                        type="button"
+                        className="button button--secondary"
+                        onClick={() => openEdit(child)}
+                      >
+                        <Pencil size={16} />
+                        {t("common.edit")}
+                      </button>
+                      <button
+                        type="button"
+                        className="button button--ghost"
+                        onClick={() => handleDelete(child)}
+                      >
+                        <Trash2 size={16} />
+                        {t("common.delete")}
+                      </button>
+                    </>
+                  ) : null}
                   {Number(child.financials?.debt || 0) > 0 ? (
                     <button
                       type="button"
-                      className="button button--primary"
-                      onClick={() => navigate(`/payments?mode=accept&childId=${child.id}`)}
+                      className={canManage ? "button button--primary" : "button button--secondary"}
+                      onClick={() =>
+                        navigate(
+                          canManage
+                            ? `/payments?mode=accept&childId=${child.id}`
+                            : "/payments",
+                        )
+                      }
                     >
                       {t("children.payAction")}
                     </button>
@@ -353,7 +379,7 @@ export function ChildrenPage() {
         onClose={resetModal}
       >
         <form className="stack-lg" onSubmit={handleSubmit}>
-          {user.role === "STAFF" ? (
+          {user.role === "ADMIN" ? (
             <label className="field">
               <span>{t("children.parentLabel")}</span>
               <select

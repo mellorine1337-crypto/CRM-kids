@@ -14,7 +14,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import { Modal } from "../components/Modal.jsx";
 import { PageHeader } from "../components/PageHeader.jsx";
@@ -35,6 +35,7 @@ const emptyLesson = {
   startTime: "10:00",
   endTime: "11:00",
   capacity: 10,
+  teacherId: "",
   teacherName: "",
   price: 5000,
 };
@@ -82,7 +83,22 @@ const createParentPreviewLesson = (enrollment) => ({
   ...enrollment.lesson,
   childName: enrollment.child?.fullName,
   scheduleStatus: enrollment.attendance?.status || enrollment.status,
+  enrollmentId: enrollment.id,
+  canShowQr: enrollment.status === "BOOKED" && isFutureOrTodayLesson(enrollment),
+  canCancel: enrollment.status === "BOOKED" && isFutureOrTodayLesson(enrollment),
 });
+
+const getParentScheduleTone = (status) => {
+  if (status === "PRESENT" || status === "ATTENDED") {
+    return "success";
+  }
+
+  if (status === "ABSENT" || status === "MISSED") {
+    return "danger";
+  }
+
+  return "planned";
+};
 
 const requestLessons = async ({ title, age, date }) => {
   const params = {};
@@ -107,8 +123,10 @@ export function LessonsPage() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [lessons, setLessons] = useState([]);
+  const [teachers, setTeachers] = useState([]);
   const [parentEnrollments, setParentEnrollments] = useState([]);
   const [filters, setFilters] = useState({
     title: "",
@@ -122,7 +140,7 @@ export function LessonsPage() {
   const [viewMode, setViewMode] = useState("month");
   const [cursorDate, setCursorDate] = useState(new Date());
   const deferredTitle = useDeferredValue(filters.title);
-  const canManage = user.role !== "PARENT";
+  const canManage = user.role === "ADMIN";
   const localeCode = LOCALE_CODE_MAP[locale] || LOCALE_CODE_MAP.ru;
 
   const refreshLessons = useCallback(async () => {
@@ -154,11 +172,16 @@ export function LessonsPage() {
 
     const syncLessons = async () => {
       try {
-        const items = await requestLessons({
-          title: deferredTitle,
-          age: filters.age,
-          date: filters.date,
-        });
+        const [items, teachersResponse] = await Promise.all([
+          requestLessons({
+            title: deferredTitle,
+            age: filters.age,
+            date: filters.date,
+          }),
+          user.role === "ADMIN"
+            ? api.get("/users/teachers")
+            : Promise.resolve({ data: { items: [] } }),
+        ]);
 
         if (cancelled) {
           return;
@@ -166,6 +189,7 @@ export function LessonsPage() {
 
         startTransition(() => {
           setLessons(items);
+          setTeachers(teachersResponse.data.items);
         });
       } catch (error) {
         if (cancelled) {
@@ -339,7 +363,11 @@ export function LessonsPage() {
 
   const openCreate = () => {
     setEditingLesson(null);
-    setForm(emptyLesson);
+    setForm({
+      ...emptyLesson,
+      teacherId: teachers[0]?.id || "",
+      teacherName: teachers[0]?.fullName || "",
+    });
     setModalOpen(true);
   };
 
@@ -354,6 +382,7 @@ export function LessonsPage() {
       startTime: lesson.startTime,
       endTime: lesson.endTime,
       capacity: lesson.capacity,
+      teacherId: lesson.teacherId || "",
       teacherName: lesson.teacherName,
       price: lesson.price,
     });
@@ -368,6 +397,16 @@ export function LessonsPage() {
 
   const handleFormChange = (event) => {
     const { name, value } = event.target;
+    if (name === "teacherId") {
+      const selectedTeacher = teachers.find((teacher) => teacher.id === value);
+      setForm((current) => ({
+        ...current,
+        teacherId: value,
+        teacherName: selectedTeacher?.fullName || "",
+      }));
+      return;
+    }
+
     setForm((current) => ({ ...current, [name]: value }));
   };
 
@@ -381,6 +420,7 @@ export function LessonsPage() {
         ageMax: Number(form.ageMax),
         capacity: Number(form.capacity),
         price: Number(form.price),
+        teacherId: form.teacherId || undefined,
         date: new Date(form.date).toISOString(),
       };
 
@@ -425,6 +465,31 @@ export function LessonsPage() {
     } catch (error) {
       showToast({
         title: t("lessons.deleteFailed"),
+        description: error.message,
+        tone: "error",
+      });
+    }
+  };
+
+  const handleCancelEnrollment = async (enrollmentId) => {
+    try {
+      await api.patch(`/enrollments/${enrollmentId}/cancel`);
+      setParentEnrollments((current) =>
+        current.map((enrollment) =>
+          enrollment.id === enrollmentId
+            ? { ...enrollment, status: "CANCELLED" }
+            : enrollment,
+        ),
+      );
+      setPreviewLesson(null);
+      showToast({
+        title: t("enrollments.cancelled"),
+        description: t("lessons.parentCancelledDescription"),
+        tone: "success",
+      });
+    } catch (error) {
+      showToast({
+        title: t("enrollments.cancelFailed"),
         description: error.message,
         tone: "error",
       });
@@ -476,15 +541,14 @@ export function LessonsPage() {
       <button
         key={enrollment.id}
         type="button"
-        className="schedule-entry"
-        style={getLessonAccent(lesson)}
+        className={`schedule-entry schedule-entry--${getParentScheduleTone(enrollment.attendance?.status || enrollment.status)}`}
         onClick={() => setPreviewLesson(createParentPreviewLesson(enrollment))}
         title={`${lesson.startTime} ${lesson.title}`}
       >
         <span className="schedule-entry__dot" />
         <span className="schedule-entry__time">{lesson.startTime}</span>
-        <span className="schedule-entry__title">{lesson.title}</span>
-        <span className="schedule-entry__count">{childShortName}</span>
+        <span className="schedule-entry__title">{childShortName}</span>
+        <span className="schedule-entry__count">{lesson.title}</span>
       </button>
     );
   };
@@ -492,10 +556,7 @@ export function LessonsPage() {
   if (user.role === "PARENT") {
     return (
       <div className="stack-xl">
-        <PageHeader
-          title={t("lessons.parentTitle")}
-          description={t("lessons.parentDescription")}
-        />
+        <PageHeader title={t("lessons.parentTitle")} />
 
         <section className="panel schedule-panel">
           <div className="schedule-toolbar">
@@ -630,7 +691,7 @@ export function LessonsPage() {
                         <article className="schedule-day-card" key={enrollment.id}>
                           <div className="schedule-day-card__head">
                             <div>
-                              <strong>{enrollment.lesson.title}</strong>
+                              <strong>{enrollment.child?.fullName}</strong>
                               <span>
                                 {enrollment.lesson.startTime} - {enrollment.lesson.endTime}
                               </span>
@@ -640,18 +701,8 @@ export function LessonsPage() {
                             />
                           </div>
                           <div className="lesson-card__meta">
-                            <span>{enrollment.child?.fullName}</span>
-                            <span>
-                              {t("lessons.teacher", {
-                                name: enrollment.lesson.teacherName,
-                              })}
-                            </span>
-                            <span>{enrollment.lesson.description || t("lessons.noDescription")}</span>
-                            {isFutureOrTodayLesson(enrollment) ? (
-                              <span className="parent-schedule-chip">
-                                {t("lessons.parentUpcomingLabel")}
-                              </span>
-                            ) : null}
+                            <span>{enrollment.lesson.title}</span>
+                            <span>{enrollment.lesson.teacherName}</span>
                           </div>
                           <div className="row-actions">
                             <button
@@ -933,7 +984,7 @@ export function LessonsPage() {
         title={previewLesson?.title || t("lessons.lessonDetails")}
         onClose={() => setPreviewLesson(null)}
       >
-        {previewLesson ? (
+            {previewLesson ? (
           <div className="stack-lg">
             <div className="detail-grid">
               {previewLesson.childName ? (
@@ -968,12 +1019,14 @@ export function LessonsPage() {
               </div>
             </div>
 
-            <div className="detail-card detail-card--highlight">
-              <span>{t("lessons.descriptionField")}</span>
-              <p>{previewLesson.description || t("lessons.noDescription")}</p>
-            </div>
+            {previewLesson.description ? (
+              <div className="detail-card detail-card--highlight">
+                <span>{t("lessons.descriptionField")}</span>
+                <p>{previewLesson.description}</p>
+              </div>
+            ) : null}
 
-            {user.role !== "PARENT" ? (
+            {canManage ? (
               <div className="row-actions">
                 <button
                   type="button"
@@ -995,7 +1048,37 @@ export function LessonsPage() {
                   {t("common.delete")}
                 </button>
               </div>
-            ) : null}
+            ) : (
+              <div className="row-actions">
+                <button
+                  type="button"
+                  className="button button--secondary"
+                  onClick={() =>
+                    navigate(`/attendance?enrollmentId=${previewLesson.enrollmentId}`)
+                  }
+                  disabled={!previewLesson.canShowQr}
+                >
+                  <CalendarDays size={16} />
+                  {t("lessons.openQr")}
+                </button>
+                <button
+                  type="button"
+                  className="button button--secondary"
+                  onClick={() => navigate("/feedback")}
+                >
+                  {t("lessons.writeTeacher")}
+                </button>
+                <button
+                  type="button"
+                  className="button button--danger"
+                  onClick={() => handleCancelEnrollment(previewLesson.enrollmentId)}
+                  disabled={!previewLesson.canCancel}
+                >
+                  <Trash2 size={16} />
+                  {t("lessons.cancelEnrollment")}
+                </button>
+              </div>
+            )}
           </div>
         ) : null}
       </Modal>
@@ -1087,12 +1170,19 @@ export function LessonsPage() {
             </label>
             <label className="field">
               <span>{t("lessons.teacherField")}</span>
-              <input
-                name="teacherName"
-                value={form.teacherName}
+              <select
+                name="teacherId"
+                value={form.teacherId}
                 onChange={handleFormChange}
                 required
-              />
+              >
+                <option value="">{t("lessons.selectTeacher")}</option>
+                {teachers.map((teacher) => (
+                  <option key={teacher.id} value={teacher.id}>
+                    {teacher.fullName}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="field">
               <span>{t("lessons.price")}</span>

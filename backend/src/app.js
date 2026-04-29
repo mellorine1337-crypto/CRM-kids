@@ -14,6 +14,7 @@ const app = express();
 const openApiDocument = YAML.load(path.join(__dirname, "../docs/openapi.yaml"));
 const isDevelopment = env.nodeEnv !== "production";
 const allowedOrigins = new Set([env.frontendUrl]);
+// В dev-режиме разрешаем локальные адреса сети, потому что Vite часто запускается на другом порту или по LAN IP.
 const devOriginPatterns = [
   /^http:\/\/localhost:\d+$/,
   /^http:\/\/127\.0\.0\.1:\d+$/,
@@ -51,6 +52,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use("/uploads", express.static(env.uploadDir));
+// Swagger подключён к тому же Express-приложению, чтобы спецификация API и реальная реализация не расходились.
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiDocument));
 app.use("/api", routes);
 app.use(notFoundHandler);

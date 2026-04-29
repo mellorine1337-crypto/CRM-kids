@@ -39,7 +39,7 @@ router.get(
 
 router.get(
   "/parents",
-  requireRoles("STAFF"),
+  requireRoles("ADMIN"),
   asyncHandler(async (_req, res) => {
     const parents = await prisma.user.findMany({
       where: {
@@ -50,6 +50,23 @@ router.get(
 
     res.json({
       items: parents.map(serializeUser),
+    });
+  }),
+);
+
+router.get(
+  "/teachers",
+  requireRoles("ADMIN"),
+  asyncHandler(async (_req, res) => {
+    const teachers = await prisma.user.findMany({
+      where: {
+        role: "TEACHER",
+      },
+      orderBy: { fullName: "asc" },
+    });
+
+    res.json({
+      items: teachers.map(serializeUser),
     });
   }),
 );

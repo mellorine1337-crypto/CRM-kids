@@ -21,6 +21,17 @@ const attendanceQrScanSchema = z.object({
 
 router.use(requireAuth);
 
+const ensureTeacherAccessToLesson = (user, lesson) => {
+  if (
+    user.role === "TEACHER" &&
+    lesson.teacherId !== user.id &&
+    lesson.teacherName !== user.fullName
+  ) {
+    throw { status: 403, message: "Insufficient permissions" };
+  }
+};
+
+// Любая операция по посещаемости начинается с enrollment, потому что посещаемость всегда привязана к конкретной записи на занятие.
 const loadEnrollment = async (enrollmentId) => {
   const enrollment = await prisma.enrollment.findUnique({
     where: { id: enrollmentId },
@@ -42,6 +53,7 @@ const loadEnrollment = async (enrollmentId) => {
   return enrollment;
 };
 
+// Upsert делает маршрут идемпотентным: сотрудник может переотметить ребёнка без создания дубликатов attendance.
 const saveAttendance = async ({ enrollmentId, status, comment, markedBy }) => {
   const attendance = await prisma.attendance.upsert({
     where: {
@@ -73,10 +85,11 @@ const saveAttendance = async ({ enrollmentId, status, comment, markedBy }) => {
 
 router.post(
   "/",
-  requireRoles("STAFF"),
+  requireRoles("ADMIN", "TEACHER"),
   asyncHandler(async (req, res) => {
     const data = attendanceSchema.parse(req.body);
     const enrollment = await loadEnrollment(data.enrollmentId);
+    ensureTeacherAccessToLesson(req.user, enrollment.lesson);
 
     if (enrollment.status === "CANCELLED") {
       throw { status: 400, message: "Cancelled enrollment cannot be checked in" };
@@ -89,6 +102,7 @@ router.post(
       markedBy: req.user.id,
     });
 
+    // Родитель получает то же событие посещаемости в виде in-app уведомления и, если настроен SMTP, письмом.
     await createNotification({
       userId: enrollment.child.parent.id,
       email: enrollment.child.parent.email,
@@ -171,7 +185,7 @@ router.get(
 
 router.post(
   "/scan",
-  requireRoles("STAFF"),
+  requireRoles("ADMIN", "TEACHER"),
   asyncHandler(async (req, res) => {
     const data = attendanceQrScanSchema.parse(req.body);
 
@@ -184,6 +198,7 @@ router.post(
     }
 
     const enrollment = await loadEnrollment(payload.sub);
+    ensureTeacherAccessToLesson(req.user, enrollment.lesson);
 
     if (enrollment.status === "CANCELLED") {
       throw { status: 400, message: "Cancelled enrollment cannot be checked in" };
@@ -196,6 +211,7 @@ router.post(
       markedBy: req.user.id,
     });
 
+    // QR здесь только альтернативный способ ввода, но запись всё равно попадает в ту же attendance-таблицу, что и ручная отметка.
     await createNotification({
       userId: enrollment.child.parent.id,
       email: enrollment.child.parent.email,
@@ -248,6 +264,18 @@ router.get(
         : {
             enrollment: {
               lessonId: req.params.lessonId,
+              ...(req.user.role === "TEACHER"
+                ? {
+                    lesson: {
+                      is: {
+                        OR: [
+                          { teacherId: req.user.id },
+                          { teacherName: req.user.fullName },
+                        ],
+                      },
+                    },
+                  }
+                : {}),
             },
           };
 

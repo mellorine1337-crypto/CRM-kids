@@ -37,7 +37,8 @@ const env = {
   },
   uploadDir: process.env.UPLOAD_DIR || path.join(rootDir, "uploads"),
   seed: {
-    staffPassword: process.env.SEED_STAFF_PASSWORD || "Staff123!",
+    adminPassword: process.env.SEED_ADMIN_PASSWORD || "Admin123!",
+    teacherPassword: process.env.SEED_TEACHER_PASSWORD || "Teacher123!",
     parentPassword: process.env.SEED_PARENT_PASSWORD || "Parent123!",
   },
 };

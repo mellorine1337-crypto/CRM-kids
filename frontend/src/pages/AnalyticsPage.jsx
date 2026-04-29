@@ -92,7 +92,7 @@ export function AnalyticsPage() {
       }
     };
 
-    if (user.role === "STAFF") {
+    if (user.role === "ADMIN") {
       loadAnalytics();
     }
   }, [showToast, t, user.role]);
@@ -124,7 +124,7 @@ export function AnalyticsPage() {
     [analytics.teacherPerformance],
   );
 
-  if (user.role !== "STAFF") {
+  if (user.role !== "ADMIN") {
     return <Navigate to="/" replace />;
   }
 

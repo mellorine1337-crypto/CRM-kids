@@ -60,7 +60,7 @@ export function IntegrationsPage() {
       }
     };
 
-    if (user.role === "STAFF") {
+    if (user.role === "ADMIN") {
       loadIntegrations();
     }
   }, [reloadKey, showToast, t, user.role]);
@@ -70,7 +70,7 @@ export function IntegrationsPage() {
     [items, selectedId],
   );
 
-  if (user.role !== "STAFF") {
+  if (user.role !== "ADMIN") {
     return <Navigate to="/" replace />;
   }
 

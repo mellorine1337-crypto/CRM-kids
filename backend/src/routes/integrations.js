@@ -23,7 +23,7 @@ const integrationUpdateSchema = integrationSchema
   });
 
 router.use(requireAuth);
-router.use(requireRoles("STAFF"));
+router.use(requireRoles("ADMIN"));
 
 router.get(
   "/",
