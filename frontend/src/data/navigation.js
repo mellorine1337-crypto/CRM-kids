@@ -30,19 +30,13 @@ export const navigationItems = [
     to: "/journal",
     labelKey: "navigation.journal",
     icon: BookOpen,
-    roles: ["STAFF", "PARENT"],
+    roles: ["STAFF"],
   },
   {
     to: "/recommendations",
     labelKey: "navigation.recommendations",
     icon: Lightbulb,
-    roles: ["STAFF", "PARENT"],
-  },
-  {
-    to: "/children",
-    labelKey: "navigation.children",
-    icon: Users,
-    roles: ["STAFF", "PARENT"],
+    roles: ["STAFF"],
   },
   {
     to: "/lessons",
@@ -54,7 +48,7 @@ export const navigationItems = [
     to: "/enrollments",
     labelKey: "navigation.enrollments",
     icon: Sparkles,
-    roles: ["STAFF", "PARENT"],
+    roles: ["STAFF"],
   },
   {
     to: "/attendance",
@@ -72,7 +66,7 @@ export const navigationItems = [
     to: "/feedback",
     labelKey: "navigation.feedback",
     icon: MessageSquareMore,
-    roles: ["STAFF", "PARENT"],
+    roles: ["STAFF"],
   },
   {
     to: "/notifications",

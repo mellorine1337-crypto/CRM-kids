@@ -1,37 +1,39 @@
-# Education Center CRM MVP
+# MVP CRM для образовательного центра
 
-MVP CRM for an education center built with a JavaScript stack.
+MVP CRM-система для образовательного центра, построенная на JavaScript-стеке.
 
-The broader product idea is a single system for educational centers that combines:
+Более широкая идея продукта состоит в создании единой системы для учебных центров, которая объединяет:
 
-- a journal for attendance and learning progress
-- a public course showcase website
-- a CRM workspace for operations, enrollments, payments and communication
+- журнал посещаемости и учебного прогресса
+- публичный сайт-витрину курсов
+- CRM-рабочее пространство для операций, записей, оплат и коммуникации
 
-This repository currently implements the CRM MVP and attendance-oriented workflows that support the educational process for children, parents and staff.
+В этом репозитории реализован CRM MVP и связанные с посещаемостью процессы, которые поддерживают учебный процесс для детей, родителей и сотрудников.
 
 - `backend`: Node.js, Express, Prisma, PostgreSQL, JWT, Swagger
-- `frontend`: React, React Router, Axios, Stripe client support
-- `database`: PostgreSQL via Docker Compose
+- `frontend`: React, React Router, Axios, поддержка Stripe client
+- `database`: PostgreSQL через Docker Compose
 
-## What is included
+## Что реализовано
 
-- authentication with `access + refresh` JWT tokens
-- role model: `STAFF`, `PARENT`
-- self-registration for `PARENT`, while `STAFF` accounts are created separately by the center
-- student profiles managed through parent-linked child records
-- staff-only analytics dashboard with revenue, attendance, funnel and occupancy metrics
-- lessons, schedule and course-session management
-- enrollments with capacity checks
-- attendance journal
-- two-way feedback threads between parent and staff
-- payments with mock mode and Stripe test-mode support
-- in-app notifications plus email transport stub
-- child profile photo uploads in local dev storage
-- Swagger OpenAPI file
-- seed with demo accounts
+- аутентификация через JWT `access + refresh`
+- роли: `ADMIN`, `TEACHER`, `PARENT`
+- родитель входит по номеру телефона и SMS-коду
+- преподаватель входит по одноразовой magic link или SMS-коду
+- администратор входит по email и паролю
+- карточки учеников, привязанные к родителю
+- аналитическая панель для администратора: выручка, посещаемость, воронка, заполняемость
+- занятия, расписание и управление сессиями курсов
+- записи на занятия с проверкой вместимости
+- журнал посещаемости
+- двусторонняя обратная связь между родителем и преподавателем
+- оплаты в mock-режиме и поддержка Stripe test mode
+- in-app уведомления и email-заглушка
+- загрузка фото ребёнка в локальное dev-хранилище
+- Swagger OpenAPI
+- seed с тестовыми аккаунтами
 
-## Project structure
+## Структура проекта
 
 ```text
 .
@@ -47,28 +49,28 @@ This repository currently implements the CRM MVP and attendance-oriented workflo
 └── docker-compose.yml
 ```
 
-## Local run
+## Локальный запуск
 
-### 1. Install dependencies
+### 1. Установить зависимости
 
 ```bash
 npm install
 ```
 
-### 2. Configure environment
+### 2. Настроить окружение
 
 ```bash
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
 ```
 
-### 3. Start PostgreSQL
+### 3. Запустить PostgreSQL
 
 ```bash
 docker compose up -d
 ```
 
-### 4. Prepare the database
+### 4. Подготовить базу данных
 
 ```bash
 npm run prisma:generate
@@ -76,27 +78,29 @@ npm run prisma:push --workspace backend
 npm run seed
 ```
 
-### 5. Start backend and frontend
+### 5. Запустить backend и frontend
 
 ```bash
 npm run dev
 ```
 
-Applications:
+Адреса:
 
 - frontend: `http://localhost:5173`
 - backend API: `http://localhost:4000/api`
 - Swagger UI: `http://localhost:4000/api/docs`
 - PostgreSQL from Docker: `localhost:5433`
 
-## Demo accounts
+## Тестовые аккаунты
 
-- `STAFF`: `staff@kidscrm.local / Staff123!`
+- `ADMIN`: `admin@kidscrm.local / Admin123!`
+- `TEACHER`: `irina@kidscrm.local / Teacher123!`
+- `TEACHER`: `maksim@kidscrm.local / Teacher123!`
 - `PARENT`: `parent@kidscrm.local / Parent123!`
 
-Passwords can be overridden through `backend/.env`.
+Пароли можно переопределить через `backend/.env`.
 
-## Important environment variables
+## Важные переменные окружения
 
 Backend:
 
@@ -113,12 +117,12 @@ Frontend:
 - `VITE_API_BASE_URL`
 - `VITE_STRIPE_PUBLISHABLE_KEY`
 
-## Payment modes
+## Режимы оплаты
 
-- without Stripe keys the app uses a mock payment flow for development
-- with Stripe keys the frontend opens Stripe Elements and the backend confirms the real test-mode `PaymentIntent`
+- без Stripe-ключей приложение использует mock-flow для разработки
+- при наличии Stripe-ключей frontend открывает Stripe Elements, а backend подтверждает test-mode `PaymentIntent`
 
-## Verification performed
+## Что было проверено
 
 - `frontend`: `npm run lint`
 - `frontend`: `npm run build`
@@ -126,9 +130,11 @@ Frontend:
 - `backend`: `npx prisma validate`
 - `backend`: `npx prisma generate`
 
-`prisma validate/generate` were executed with an explicit `DATABASE_URL` value equivalent to `backend/.env.example`.
+`prisma validate/generate` выполнялись с явным `DATABASE_URL`, эквивалентным значению из `backend/.env.example`.
 
-## API reference
+## Ссылки на API и архитектуру
 
 - Swagger: [backend/docs/openapi.yaml](/Users/alpa/CRM--JS/backend/docs/openapi.yaml)
-- Architecture notes: [docs/architecture.md](/Users/alpa/CRM--JS/docs/architecture.md)
+- Архитектурные заметки: [docs/architecture.md](/Users/alpa/CRM--JS/docs/architecture.md)
+- Карта проекта: [docs/code-map.md](/Users/alpa/CRM--JS/docs/code-map.md)
+- Гайд для защиты: [docs/defense-guide.md](/Users/alpa/CRM--JS/docs/defense-guide.md)

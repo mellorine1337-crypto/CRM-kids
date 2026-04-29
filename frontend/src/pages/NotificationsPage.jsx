@@ -3,11 +3,13 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client.js";
 import { PageHeader } from "../components/PageHeader.jsx";
 import { StatusBadge } from "../components/StatusBadge.jsx";
+import { useAuth } from "../hooks/useAuth.js";
 import { useI18n } from "../hooks/useI18n.js";
 import { useToast } from "../hooks/useToast.js";
 import { formatDateTime } from "../utils/format.js";
 
 export function NotificationsPage() {
+  const { user } = useAuth();
   const { locale, t } = useI18n();
   const { showToast } = useToast();
   const [notifications, setNotifications] = useState([]);
@@ -59,7 +61,11 @@ export function NotificationsPage() {
     <div className="stack-xl">
       <PageHeader
         title={t("notifications.title")}
-        description={t("notifications.description")}
+        description={
+          user.role === "PARENT"
+            ? t("notifications.parentDescription")
+            : t("notifications.description")
+        }
       />
 
       <section className="stack-md">

@@ -1,4 +1,8 @@
 const { calculateAge } = require("./date");
+const {
+  buildChildFinancials,
+  buildEnrollmentFinancials,
+} = require("../lib/finance");
 
 const serializeUser = (user) => ({
   id: user.id,
@@ -22,6 +26,7 @@ const serializeChild = (child) => ({
   createdAt: child.createdAt,
   updatedAt: child.updatedAt,
   parent: child.parent ? serializeUser(child.parent) : undefined,
+  financials: child.enrollments ? buildChildFinancials(child) : undefined,
 });
 
 const serializeLesson = (lesson) => {
@@ -57,11 +62,20 @@ const serializeEnrollment = (enrollment) => ({
   updatedAt: enrollment.updatedAt,
   child: enrollment.child ? serializeChild(enrollment.child) : undefined,
   lesson: enrollment.lesson ? serializeLesson(enrollment.lesson) : undefined,
+  financials:
+    enrollment.lesson || enrollment.payments
+      ? buildEnrollmentFinancials(enrollment)
+      : undefined,
   payments: enrollment.payments?.map((payment) => ({
     id: payment.id,
     amount: Number(payment.amount),
     currency: payment.currency,
     status: payment.status,
+    method: payment.method,
+    serviceLabel: payment.serviceLabel,
+    comment: payment.comment,
+    paidAt: payment.paidAt,
+    recordedById: payment.recordedById,
     stripePaymentIntentId: payment.stripePaymentIntentId,
     createdAt: payment.createdAt,
     updatedAt: payment.updatedAt,
@@ -88,6 +102,16 @@ const serializeEnrollment = (enrollment) => ({
     : undefined,
 });
 
+const serializePaymentHistory = (entry) => ({
+  id: entry.id,
+  paymentId: entry.paymentId,
+  fromStatus: entry.fromStatus,
+  toStatus: entry.toStatus,
+  comment: entry.comment,
+  createdAt: entry.createdAt,
+  createdBy: entry.createdBy ? serializeUser(entry.createdBy) : undefined,
+});
+
 const serializePayment = (payment) => ({
   id: payment.id,
   parentId: payment.parentId,
@@ -95,13 +119,20 @@ const serializePayment = (payment) => ({
   amount: Number(payment.amount),
   currency: payment.currency,
   status: payment.status,
+  method: payment.method,
+  serviceLabel: payment.serviceLabel,
+  comment: payment.comment,
   stripePaymentIntentId: payment.stripePaymentIntentId,
+  paidAt: payment.paidAt,
+  recordedBy: payment.recordedBy ? serializeUser(payment.recordedBy) : undefined,
   createdAt: payment.createdAt,
   updatedAt: payment.updatedAt,
+  history: payment.history?.map(serializePaymentHistory),
   enrollment: payment.enrollment
     ? {
         id: payment.enrollment.id,
         status: payment.enrollment.status,
+        financials: buildEnrollmentFinancials(payment.enrollment),
         child: payment.enrollment.child ? serializeChild(payment.enrollment.child) : undefined,
         lesson: payment.enrollment.lesson ? serializeLesson(payment.enrollment.lesson) : undefined,
       }
@@ -203,5 +234,6 @@ module.exports = {
   serializeLesson,
   serializeNotification,
   serializePayment,
+  serializePaymentHistory,
   serializeUser,
 };

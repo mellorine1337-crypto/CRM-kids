@@ -76,12 +76,29 @@ router.post(
   requireRoles("STAFF"),
   asyncHandler(async (req, res) => {
     const data = attendanceSchema.parse(req.body);
-    await loadEnrollment(data.enrollmentId);
+    const enrollment = await loadEnrollment(data.enrollmentId);
+
+    if (enrollment.status === "CANCELLED") {
+      throw { status: 400, message: "Cancelled enrollment cannot be checked in" };
+    }
+
     const attendance = await saveAttendance({
       enrollmentId: data.enrollmentId,
       status: data.status,
       comment: data.comment,
       markedBy: req.user.id,
+    });
+
+    await createNotification({
+      userId: enrollment.child.parent.id,
+      email: enrollment.child.parent.email,
+      title: data.status === "PRESENT" ? "Посещение подтверждено" : "Отмечено отсутствие",
+      message:
+        data.status === "PRESENT"
+          ? `${enrollment.child.fullName} отмечен(а) как присутствовавший(ая) на занятии «${enrollment.lesson.title}».`
+          : `${enrollment.child.fullName} отмечен(а) как отсутствовавший(ая) на занятии «${enrollment.lesson.title}».`,
+      type: "SYSTEM",
+      channel: "EMAIL",
     });
 
     res.status(201).json({
@@ -92,6 +109,20 @@ router.post(
         comment: attendance.comment,
         markedBy: attendance.markedBy,
         markedAt: attendance.markedAt,
+      },
+      enrollment: {
+        id: enrollment.id,
+        status: data.status === "PRESENT" ? "ATTENDED" : "MISSED",
+        child: {
+          id: enrollment.child.id,
+          fullName: enrollment.child.fullName,
+        },
+        lesson: {
+          id: enrollment.lesson.id,
+          title: enrollment.lesson.title,
+          date: enrollment.lesson.date,
+          startTime: enrollment.lesson.startTime,
+        },
       },
     });
   }),

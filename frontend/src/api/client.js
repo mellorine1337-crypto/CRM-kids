@@ -16,6 +16,7 @@ export const api = axios.create({
 });
 
 let refreshPromise = null;
+const AUTH_EXPIRED_KEY = "kids-crm.authExpired";
 
 const getCurrentLocale = () =>
   localStorage.getItem(LOCALE_STORAGE_KEY) || DEFAULT_LOCALE;
@@ -80,6 +81,14 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch {
         clearTokens();
+
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem(AUTH_EXPIRED_KEY, "1");
+
+          if (window.location.pathname !== "/login") {
+            window.location.assign("/login");
+          }
+        }
       }
     }
 

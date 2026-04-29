@@ -27,9 +27,18 @@ enum EnrollmentStatus {
 
 enum PaymentStatus {
   PENDING
+  PARTIAL
   SUCCEEDED
   FAILED
   CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  TERMINAL
+  QR
+  STRIPE
 }
 
 enum AttendanceStatus {
@@ -86,6 +95,8 @@ model User {
   children             Child[]        @relation("ParentChildren")
   createdLessons       Lesson[]       @relation("LessonCreator")
   payments             Payment[]      @relation("ParentPayments")
+  recordedPayments     Payment[]      @relation("PaymentRecorder")
+  paymentHistoryEvents PaymentHistory[] @relation("PaymentHistoryActor")
   markedAttendances    Attendance[]   @relation("AttendanceMarker")
   notifications        Notification[]
   refreshTokens        RefreshToken[]
@@ -159,17 +170,41 @@ model Payment {
   parentId              String
   enrollmentId          String
   amount                Decimal       @db.Decimal(10, 2)
-  currency              String        @default("usd")
+  currency              String        @default("kzt")
   status                PaymentStatus @default(PENDING)
+  method                PaymentMethod @default(CASH)
+  serviceLabel          String?
+  comment               String?
   stripePaymentIntentId String?
   clientSecret          String?
+  recordedById          String?
+  paidAt                DateTime?
   parent                User          @relation("ParentPayments", fields: [parentId], references: [id], onDelete: Cascade)
   enrollment            Enrollment    @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  recordedBy            User?         @relation("PaymentRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+  history               PaymentHistory[]
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
 
   @@index([parentId])
   @@index([enrollmentId])
+  @@index([recordedById])
+  @@index([paidAt])
+}
+
+model PaymentHistory {
+  id          String         @id @default(cuid())
+  paymentId   String
+  fromStatus  PaymentStatus?
+  toStatus    PaymentStatus
+  comment     String?
+  createdById String?
+  createdAt   DateTime       @default(now())
+  payment     Payment        @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  createdBy   User?          @relation("PaymentHistoryActor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([paymentId, createdAt])
+  @@index([createdById])
 }
 
 model Attendance {

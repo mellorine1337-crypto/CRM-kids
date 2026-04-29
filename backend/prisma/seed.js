@@ -4,6 +4,18 @@ const { env } = require("../src/config/env");
 
 const prisma = new PrismaClient();
 
+const atTime = (baseDate, hours, minutes) => {
+  const value = new Date(baseDate);
+  value.setHours(hours, minutes, 0, 0);
+  return value;
+};
+
+const addDays = (baseDate, days) => {
+  const value = new Date(baseDate);
+  value.setDate(value.getDate() + days);
+  return value;
+};
+
 const upsertUser = async ({ fullName, email, phone, password, role }) => {
   const passwordHash = await bcrypt.hash(password, 10);
 
@@ -59,15 +71,25 @@ const ensureLesson = async ({
   createdBy,
 }) => {
   const existingLesson = await prisma.lesson.findFirst({
-    where: {
-      title,
-      date,
-      startTime,
-    },
+    where: { title },
   });
 
   if (existingLesson) {
-    return existingLesson;
+    return prisma.lesson.update({
+      where: { id: existingLesson.id },
+      data: {
+        description,
+        ageMin,
+        ageMax,
+        date,
+        startTime,
+        endTime,
+        capacity,
+        teacherName,
+        price: price.toFixed(2),
+        createdBy,
+      },
+    });
   }
 
   return prisma.lesson.create({
@@ -85,6 +107,76 @@ const ensureLesson = async ({
       createdBy,
     },
   });
+};
+
+const ensurePayment = async ({
+  parentId,
+  enrollmentId,
+  amount,
+  currency = "kzt",
+  status,
+  method,
+  serviceLabel,
+  comment,
+  stripePaymentIntentId,
+  clientSecret,
+  recordedById,
+  paidAt,
+  historyComment,
+}) => {
+  const existingPayment = await prisma.payment.findFirst({
+    where: {
+      enrollmentId,
+      status,
+      amount: amount.toFixed(2),
+      method,
+    },
+  });
+
+  const payload = {
+    parentId,
+    enrollmentId,
+    amount: amount.toFixed(2),
+    currency,
+    status,
+    method,
+    serviceLabel,
+    comment: comment || null,
+    stripePaymentIntentId: stripePaymentIntentId || null,
+    clientSecret: clientSecret || null,
+    recordedById: recordedById || null,
+    paidAt: paidAt || null,
+  };
+
+  const payment = existingPayment
+    ? await prisma.payment.update({
+        where: { id: existingPayment.id },
+        data: payload,
+      })
+    : await prisma.payment.create({
+        data: payload,
+      });
+
+  const existingHistory = await prisma.paymentHistory.findFirst({
+    where: {
+      paymentId: payment.id,
+      toStatus: status,
+      comment: historyComment || comment || null,
+    },
+  });
+
+  if (!existingHistory) {
+    await prisma.paymentHistory.create({
+      data: {
+        paymentId: payment.id,
+        toStatus: status,
+        comment: historyComment || comment || null,
+        createdById: recordedById || null,
+      },
+    });
+  }
+
+  return payment;
 };
 
 const ensureNotification = async ({ userId, title, message, type, channel }) => {
@@ -263,6 +355,9 @@ const ensureFeedbackThread = async ({
 };
 
 async function main() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
   const staff = await upsertUser({
     fullName: "Sergey Staff",
     email: "staff@kidscrm.local",
@@ -316,7 +411,7 @@ async function main() {
     description: "Рисование, живопись и творческие упражнения",
     ageMin: 5,
     ageMax: 9,
-    date: new Date("2026-04-10T00:00:00.000Z"),
+    date: atTime(today, 0, 0),
     startTime: "10:00",
     endTime: "11:00",
     capacity: 12,
@@ -330,7 +425,7 @@ async function main() {
     description: "Практические основы робототехники для дошкольников",
     ageMin: 6,
     ageMax: 10,
-    date: new Date("2026-04-12T00:00:00.000Z"),
+    date: atTime(today, 0, 0),
     startTime: "14:00",
     endTime: "15:30",
     capacity: 10,
@@ -344,7 +439,7 @@ async function main() {
     description: "Развитие чтения, понимания текста и словарного запаса",
     ageMin: 6,
     ageMax: 10,
-    date: new Date("2026-04-02T00:00:00.000Z"),
+    date: atTime(addDays(today, -6), 0, 0),
     startTime: "16:00",
     endTime: "17:00",
     capacity: 8,
@@ -358,7 +453,7 @@ async function main() {
     description: "Логические задачи, счёт и внимательность",
     ageMin: 5,
     ageMax: 9,
-    date: new Date("2026-03-29T00:00:00.000Z"),
+    date: atTime(addDays(today, -10), 0, 0),
     startTime: "12:00",
     endTime: "13:00",
     capacity: 10,
@@ -372,7 +467,7 @@ async function main() {
     description: "Практика сборки, командная работа и мини-проекты",
     ageMin: 6,
     ageMax: 10,
-    date: new Date("2026-04-04T00:00:00.000Z"),
+    date: atTime(addDays(today, 1), 0, 0),
     startTime: "15:00",
     endTime: "16:30",
     capacity: 10,
@@ -466,96 +561,77 @@ async function main() {
     },
   });
 
-  const existingPayment = await prisma.payment.findFirst({
-    where: {
-      enrollmentId: enrollmentOne.id,
-      status: "SUCCEEDED",
-    },
+  await ensurePayment({
+    parentId: parent.id,
+    enrollmentId: enrollmentOne.id,
+    amount: 5500,
+    status: "SUCCEEDED",
+    method: "TERMINAL",
+    serviceLabel: lessonOne.title,
+    comment: "Оплата на ресепшене через терминал",
+    recordedById: staff.id,
+    paidAt: atTime(today, 9, 20),
+    historyComment: "Создана и подтверждена оплата через терминал",
   });
 
-  if (!existingPayment) {
-    await prisma.payment.create({
-      data: {
-        parentId: parent.id,
-        enrollmentId: enrollmentOne.id,
-        amount: "5500.00",
-        currency: "kzt",
-        status: "SUCCEEDED",
-        stripePaymentIntentId: "mock_pi_seed_success",
-        clientSecret: "mock_secret_seed_success",
-      },
-    });
-  }
-
-  const paymentTwo = await prisma.payment.findFirst({
-    where: {
-      enrollmentId: enrollmentTwo.id,
-      status: "SUCCEEDED",
-    },
+  await ensurePayment({
+    parentId: parent.id,
+    enrollmentId: enrollmentTwo.id,
+    amount: 6200,
+    status: "SUCCEEDED",
+    method: "BANK_TRANSFER",
+    serviceLabel: lessonThree.title,
+    comment: "Перевод от родителя по реквизитам центра",
+    recordedById: staff.id,
+    paidAt: atTime(addDays(today, -5), 18, 10),
+    historyComment: "Оплата подтверждена переводом",
   });
 
-  if (!paymentTwo) {
-    await prisma.payment.create({
-      data: {
-        parentId: parent.id,
-        enrollmentId: enrollmentTwo.id,
-        amount: "6200.00",
-        currency: "kzt",
-        status: "SUCCEEDED",
-        stripePaymentIntentId: "mock_pi_seed_reading",
-        clientSecret: "mock_secret_seed_reading",
-      },
-    });
-  }
-
-  const paymentThree = await prisma.payment.findFirst({
-    where: {
-      enrollmentId: enrollmentThree.id,
-      status: "PENDING",
-    },
+  await ensurePayment({
+    parentId: parent.id,
+    enrollmentId: enrollmentThree.id,
+    amount: 3000,
+    status: "PARTIAL",
+    method: "CASH",
+    serviceLabel: lessonTwo.title,
+    comment: "Частичная оплата наличными",
+    recordedById: staff.id,
+    paidAt: atTime(today, 11, 10),
+    historyComment: "Зафиксирована частичная оплата",
   });
 
-  if (!paymentThree) {
-    await prisma.payment.create({
-      data: {
-        parentId: parent.id,
-        enrollmentId: enrollmentThree.id,
-        amount: "7500.00",
-        currency: "kzt",
-        status: "PENDING",
-        stripePaymentIntentId: "mock_pi_seed_pending",
-        clientSecret: "mock_secret_seed_pending",
-      },
-    });
-  }
-
-  const paymentFour = await prisma.payment.findFirst({
-    where: {
-      enrollmentId: enrollmentFive.id,
-      status: "SUCCEEDED",
-    },
+  await ensurePayment({
+    parentId: parent.id,
+    enrollmentId: enrollmentThree.id,
+    amount: 4500,
+    status: "PENDING",
+    method: "QR",
+    serviceLabel: lessonTwo.title,
+    comment: "Ожидается подтверждение оплаты по QR",
+    recordedById: staff.id,
+    paidAt: null,
+    historyComment: "Создан ожидающий платёж по QR",
   });
 
-  if (!paymentFour) {
-    await prisma.payment.create({
-      data: {
-        parentId: parentTwo.id,
-        enrollmentId: enrollmentFive.id,
-        amount: "7600.00",
-        currency: "kzt",
-        status: "SUCCEEDED",
-        stripePaymentIntentId: "mock_pi_seed_second_parent",
-        clientSecret: "mock_secret_seed_second_parent",
-      },
-    });
-  }
+  await ensurePayment({
+    parentId: parentTwo.id,
+    enrollmentId: enrollmentFive.id,
+    amount: 7600,
+    status: "SUCCEEDED",
+    method: "TERMINAL",
+    serviceLabel: lessonFive.title,
+    comment: "Полная оплата следующего занятия",
+    recordedById: staff.id,
+    paidAt: atTime(addDays(today, -1), 17, 0),
+    historyComment: "Полная оплата подтверждена",
+  });
 
   await ensureAttendance({
     enrollmentId: enrollmentTwo.id,
     markedBy: staff.id,
     status: "PRESENT",
     comment: "Отличная вовлечённость на уроке",
-    markedAt: new Date("2026-04-02T17:05:00.000Z"),
+    markedAt: atTime(addDays(today, -6), 17, 5),
   });
 
   await ensureAttendance({
@@ -563,7 +639,7 @@ async function main() {
     markedBy: staff.id,
     status: "ABSENT",
     comment: "Пропуск без предупреждения",
-    markedAt: new Date("2026-03-29T13:10:00.000Z"),
+    markedAt: atTime(addDays(today, -10), 13, 10),
   });
 
   await ensureAttendance({
@@ -571,7 +647,7 @@ async function main() {
     markedBy: staff.id,
     status: "PRESENT",
     comment: "Уверенное участие на всём занятии",
-    markedAt: new Date("2026-04-12T15:35:00.000Z"),
+    markedAt: atTime(addDays(today, -1), 15, 35),
   });
 
   await ensureJournalEntry({
@@ -582,7 +658,7 @@ async function main() {
     homeworkTitle: "Прочитать рассказ и выписать новые слова",
     homeworkDescription:
       "Прочитать материал дома, выписать 5 новых слов и составить с ними предложения.",
-    homeworkDueDate: new Date("2026-04-05T18:00:00.000Z"),
+    homeworkDueDate: atTime(addDays(today, -3), 18, 0),
     homeworkStatus: "REVIEWED",
     score: 92,
     progressLevel: "EXCELLENT",
@@ -598,7 +674,7 @@ async function main() {
     homeworkTitle: "Карточки на счёт и логические пары",
     homeworkDescription:
       "Повторить примеры на счёт и решить 6 коротких задач на логические последовательности.",
-    homeworkDueDate: new Date("2026-03-31T18:00:00.000Z"),
+    homeworkDueDate: atTime(addDays(today, -8), 18, 0),
     homeworkStatus: "OVERDUE",
     score: 58,
     progressLevel: "ATTENTION_REQUIRED",
@@ -615,7 +691,7 @@ async function main() {
     homeworkTitle: "Собрать мини-проект по инструкции",
     homeworkDescription:
       "Повторить алгоритм сборки дома и подготовить 2 идеи, как улучшить конструкцию.",
-    homeworkDueDate: new Date("2026-04-14T18:00:00.000Z"),
+    homeworkDueDate: atTime(addDays(today, 2), 18, 0),
     homeworkStatus: "SUBMITTED",
     score: 88,
     progressLevel: "GOOD",

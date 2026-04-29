@@ -7,6 +7,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { api } from "../api/client.js";
 import { PageHeader } from "../components/PageHeader.jsx";
@@ -15,13 +16,36 @@ import { useAuth } from "../hooks/useAuth.js";
 import { useI18n } from "../hooks/useI18n.js";
 import { useToast } from "../hooks/useToast.js";
 import { formatDate, formatDateTime, formatStatus } from "../utils/format.js";
+import { compareLessonDateTime, isFutureOrTodayLesson } from "../utils/schedule.js";
 
 const qrReaderElementId = "attendance-qr-reader";
+
+const getLessonDateTimeValue = (source) => {
+  const lesson = source.lesson || source;
+  const value = new Date(lesson.date);
+
+  if (lesson.startTime) {
+    const [hours = "0", minutes = "0"] = lesson.startTime.split(":");
+    value.setHours(Number(hours), Number(minutes), 0, 0);
+  }
+
+  return value;
+};
+
+const compareLessons = (left, right) =>
+  getLessonDateTimeValue(left) - getLessonDateTimeValue(right);
+
+const resolveAttendanceStatus = (enrollment, record) =>
+  record?.status || enrollment.attendance?.status || enrollment.status;
+
+const isPresentStatus = (status) => status === "PRESENT" || status === "ATTENDED";
+const isAbsentStatus = (status) => status === "ABSENT" || status === "MISSED";
 
 export function AttendancePage() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
   const { showToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const scannerRef = useRef(null);
   const [lessons, setLessons] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
@@ -48,11 +72,17 @@ export function AttendancePage() {
           api.get("/enrollments"),
         ]);
 
-        setLessons(lessonsResponse.data.items);
+        const sortedLessons = [...lessonsResponse.data.items].sort(compareLessons);
+
+        setLessons(sortedLessons);
         setEnrollments(enrollmentsResponse.data.items);
 
-        if (lessonsResponse.data.items[0]) {
-          setSelectedLessonId(lessonsResponse.data.items[0].id);
+        const nextLesson =
+          sortedLessons.find((lesson) => getLessonDateTimeValue(lesson) >= new Date()) ||
+          sortedLessons[0];
+
+        if (nextLesson) {
+          setSelectedLessonId(nextLesson.id);
         }
       } catch (error) {
         showToast({
@@ -86,6 +116,19 @@ export function AttendancePage() {
 
     loadAttendance();
   }, [selectedLessonId, showToast, t, user.role]);
+
+  useEffect(() => {
+    if (user.role !== "STAFF" || searchParams.get("mode") !== "scan") {
+      return;
+    }
+
+    setScannerEnabled(true);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("mode");
+      return next;
+    });
+  }, [searchParams, setSearchParams, user.role]);
 
   useEffect(() => {
     if (!scannerEnabled || user.role !== "STAFF") {
@@ -190,22 +233,81 @@ export function AttendancePage() {
 
   const lessonEnrollments = useMemo(
     () =>
-      enrollments.filter((enrollment) => enrollment.lessonId === selectedLessonId),
+      enrollments
+        .filter(
+          (enrollment) =>
+            (enrollment.lessonId === selectedLessonId ||
+              enrollment.lesson?.id === selectedLessonId) &&
+            enrollment.status !== "CANCELLED",
+        )
+        .sort(compareLessonDateTime),
     [enrollments, selectedLessonId],
   );
 
-  const qrEligibleEnrollments = useMemo(
+  const selectedLesson = useMemo(
+    () => lessons.find((lesson) => lesson.id === selectedLessonId) || null,
+    [lessons, selectedLessonId],
+  );
+
+  const parentAttendanceItems = useMemo(
     () =>
-      enrollments.filter(
-        (enrollment) =>
-          enrollment.status !== "CANCELLED" && enrollment.lesson && enrollment.child,
-      ),
+      enrollments
+        .filter(
+          (enrollment) =>
+            enrollment.lesson && enrollment.child && enrollment.status !== "CANCELLED",
+        )
+        .sort(compareLessonDateTime),
     [enrollments],
   );
+  const parentAttendanceStats = useMemo(
+    () => ({
+      present: parentAttendanceItems.filter(
+        (enrollment) =>
+          enrollment.attendance?.status === "PRESENT" || enrollment.status === "ATTENDED",
+      ).length,
+      absent: parentAttendanceItems.filter(
+        (enrollment) =>
+          enrollment.attendance?.status === "ABSENT" || enrollment.status === "MISSED",
+      ).length,
+      upcoming: parentAttendanceItems.filter(
+        (enrollment) =>
+          !enrollment.attendance?.status &&
+          enrollment.status === "BOOKED" &&
+          isFutureOrTodayLesson(enrollment),
+      ).length,
+    }),
+    [parentAttendanceItems],
+  );
+
+  const lessonAttendanceStats = useMemo(() => {
+    const summary = {
+      total: lessonEnrollments.length,
+      present: 0,
+      absent: 0,
+      pending: 0,
+    };
+
+    for (const enrollment of lessonEnrollments) {
+      const status = resolveAttendanceStatus(
+        enrollment,
+        attendanceByEnrollmentId[enrollment.id],
+      );
+
+      if (isPresentStatus(status)) {
+        summary.present += 1;
+      } else if (isAbsentStatus(status)) {
+        summary.absent += 1;
+      } else {
+        summary.pending += 1;
+      }
+    }
+
+    return summary;
+  }, [attendanceByEnrollmentId, lessonEnrollments]);
 
   const handleMarkAttendance = async (enrollmentId, status) => {
     try {
-      await api.post("/attendance", {
+      const { data } = await api.post("/attendance", {
         enrollmentId,
         status,
       });
@@ -215,14 +317,19 @@ export function AttendancePage() {
           enrollment.id === enrollmentId
             ? {
                 ...enrollment,
-                status: status === "PRESENT" ? "ATTENDED" : "MISSED",
+                status: data.enrollment.status,
+                attendance: {
+                  ...(enrollment.attendance || {}),
+                  status: data.attendance.status,
+                  markedAt: data.attendance.markedAt,
+                },
               }
             : enrollment,
         ),
       );
 
-      const { data } = await api.get(`/attendance/${selectedLessonId}`);
-      setAttendanceRecords(data.items);
+      const { data: attendanceData } = await api.get(`/attendance/${selectedLessonId}`);
+      setAttendanceRecords(attendanceData.items);
       showToast({
         title: t("attendance.saved"),
         description: t("attendance.savedDescription", {
@@ -270,37 +377,70 @@ export function AttendancePage() {
           description={t("attendance.descriptionParent")}
         />
 
+        <section className="grid-cards">
+          <article className="stat-card stat-card--mint">
+            <div className="stat-card__icon">
+              <Check size={20} />
+            </div>
+            <div className="stat-card__body">
+              <span>{t("attendance.present")}</span>
+              <strong>{parentAttendanceStats.present}</strong>
+            </div>
+          </article>
+          <article className="stat-card stat-card--danger">
+            <div className="stat-card__icon">
+              <X size={20} />
+            </div>
+            <div className="stat-card__body">
+              <span>{t("attendance.absent")}</span>
+              <strong>{parentAttendanceStats.absent}</strong>
+            </div>
+          </article>
+          <article className="stat-card stat-card--blue">
+            <div className="stat-card__icon">
+              <CalendarDays size={20} />
+            </div>
+            <div className="stat-card__body">
+              <span>{t("attendance.parentUpcoming")}</span>
+              <strong>{parentAttendanceStats.upcoming}</strong>
+            </div>
+          </article>
+        </section>
+
         <section className="two-column">
-          <article className="panel stack-lg">
-            <div className="panel__header">
+          <article className="panel panel--side">
+            <div className="staff-dashboard__section-head">
               <div>
-                <h2>{t("attendance.parentPassesTitle")}</h2>
-                <p>{t("attendance.parentPassesDescription")}</p>
+                <h2>{t("attendance.parentHistoryTitle")}</h2>
+                <p>{t("attendance.parentHistoryDescription")}</p>
               </div>
-              <QrCode size={18} />
+              <CalendarDays size={18} />
             </div>
 
-            {qrEligibleEnrollments.length ? (
+            {parentAttendanceItems.length ? (
               <div className="stack-md">
-                {qrEligibleEnrollments.map((enrollment) => (
-                  <article className="qr-pass-list-item" key={enrollment.id}>
+                {parentAttendanceItems.map((enrollment) => (
+                  <article className="parent-schedule-card" key={enrollment.id}>
                     <div>
-                      <strong>{enrollment.child?.fullName}</strong>
-                      <span>{enrollment.lesson?.title}</span>
+                      <strong>{formatDate(enrollment.lesson?.date, locale)}</strong>
                       <span>
-                        {formatDate(enrollment.lesson?.date, locale)} • {enrollment.lesson?.startTime}
+                        {enrollment.lesson?.title} • {enrollment.lesson?.startTime}
                       </span>
+                      <span>{enrollment.child?.fullName}</span>
+                      <span>{enrollment.lesson?.teacherName}</span>
                     </div>
                     <div className="stack-sm">
                       <StatusBadge status={enrollment.attendance?.status || enrollment.status} />
-                      <button
-                        type="button"
-                        className="button button--secondary"
-                        onClick={() => handleLoadQrPass(enrollment.id)}
-                      >
-                        <QrCode size={16} />
-                        {t("attendance.showQr")}
-                      </button>
+                      {enrollment.status === "BOOKED" && isFutureOrTodayLesson(enrollment) ? (
+                        <button
+                          type="button"
+                          className="button button--secondary"
+                          onClick={() => handleLoadQrPass(enrollment.id)}
+                        >
+                          <QrCode size={16} />
+                          {t("attendance.showQr")}
+                        </button>
+                      ) : null}
                     </div>
                   </article>
                 ))}
@@ -310,11 +450,11 @@ export function AttendancePage() {
             )}
           </article>
 
-          <article className="panel">
-            <div className="panel__header">
+          <article className="panel panel--side">
+            <div className="staff-dashboard__section-head">
               <div>
                 <h2>{t("attendance.qrPassTitle")}</h2>
-                <p>{t("attendance.qrPassDescription")}</p>
+                <p>{t("attendance.parentQrDescription")}</p>
               </div>
               <ShieldCheck size={18} />
             </div>
@@ -344,22 +484,9 @@ export function AttendancePage() {
                 </div>
               </div>
             ) : (
-              <div className="empty-state">{t("attendance.qrEmpty")}</div>
+              <div className="empty-state">{t("attendance.parentQrEmpty")}</div>
             )}
           </article>
-        </section>
-
-        <section className="card-grid">
-          {enrollments.map((enrollment) => (
-            <article className="panel stack-sm" key={enrollment.id}>
-              <strong>{enrollment.child?.fullName}</strong>
-              <span>{enrollment.lesson?.title}</span>
-              <span>{formatDate(enrollment.lesson?.date, locale)}</span>
-              <StatusBadge
-                status={enrollment.attendance?.status || enrollment.status}
-              />
-            </article>
-          ))}
         </section>
       </div>
     );
@@ -429,7 +556,15 @@ export function AttendancePage() {
           ) : null}
         </article>
 
-        <article className="panel">
+        <article className="panel stack-md">
+          <div className="panel__header">
+            <div>
+              <h2>{t("attendance.selectedLessonTitle")}</h2>
+              <p>{t("attendance.selectedLessonDescription")}</p>
+            </div>
+            <CalendarDays size={18} />
+          </div>
+
           <label className="field">
             <span>{t("attendance.lesson")}</span>
             <select
@@ -444,58 +579,131 @@ export function AttendancePage() {
               ))}
             </select>
           </label>
+
+          {selectedLesson ? (
+            <div className="attendance-lesson-card">
+              <div className="attendance-lesson-card__row">
+                <span>{t("attendance.lessonDate")}</span>
+                <strong>{formatDate(selectedLesson.date, locale)}</strong>
+              </div>
+              <div className="attendance-lesson-card__row">
+                <span>{t("attendance.lessonTime")}</span>
+                <strong>{`${selectedLesson.startTime} - ${selectedLesson.endTime}`}</strong>
+              </div>
+              <div className="attendance-lesson-card__row">
+                <span>{t("attendance.teacher")}</span>
+                <strong>{selectedLesson.teacherName}</strong>
+              </div>
+              <div className="attendance-lesson-card__row">
+                <span>{t("attendance.total")}</span>
+                <strong>{lessonAttendanceStats.total}</strong>
+              </div>
+            </div>
+          ) : (
+            <div className="empty-state">{t("attendance.noLessons")}</div>
+          )}
         </article>
       </section>
 
-      <div className="table-shell">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>{t("attendance.child")}</th>
-              <th>{t("attendance.status")}</th>
-              <th>{t("attendance.markedBy")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
+      <section className="grid-cards">
+        <article className="stat-card stat-card--mint">
+          <div className="stat-card__icon">
+            <Check size={20} />
+          </div>
+          <div className="stat-card__body">
+            <span>{t("attendance.present")}</span>
+            <strong>{lessonAttendanceStats.present}</strong>
+          </div>
+        </article>
+        <article className="stat-card stat-card--danger">
+          <div className="stat-card__icon">
+            <X size={20} />
+          </div>
+          <div className="stat-card__body">
+            <span>{t("attendance.absent")}</span>
+            <strong>{lessonAttendanceStats.absent}</strong>
+          </div>
+        </article>
+        <article className="stat-card stat-card--orange">
+          <div className="stat-card__icon">
+            <CalendarDays size={20} />
+          </div>
+          <div className="stat-card__body">
+            <span>{t("attendance.pending")}</span>
+            <strong>{lessonAttendanceStats.pending}</strong>
+          </div>
+        </article>
+        <article className="stat-card stat-card--blue">
+          <div className="stat-card__icon">
+            <ShieldCheck size={20} />
+          </div>
+          <div className="stat-card__body">
+            <span>{t("attendance.total")}</span>
+            <strong>{lessonAttendanceStats.total}</strong>
+          </div>
+        </article>
+      </section>
+
+      <section className="panel stack-lg">
+        <div className="panel__header">
+          <div>
+            <h2>{t("attendance.rosterTitle")}</h2>
+            <p>{t("attendance.rosterDescription")}</p>
+          </div>
+          <ShieldCheck size={18} />
+        </div>
+
+        {lessonEnrollments.length ? (
+          <div className="attendance-roster">
             {lessonEnrollments.map((enrollment) => {
               const record = attendanceByEnrollmentId[enrollment.id];
+              const currentStatus = resolveAttendanceStatus(enrollment, record);
+
               return (
-                <tr key={enrollment.id}>
-                  <td>{enrollment.child?.fullName}</td>
-                  <td>
-                    <StatusBadge status={record?.status || enrollment.status} />
-                  </td>
-                  <td>{record?.markedBy?.fullName || t("attendance.notMarkedYet")}</td>
-                  <td>
-                    <div className="row-actions">
-                      <button
-                        type="button"
-                        className="button button--secondary"
-                        onClick={() => handleMarkAttendance(enrollment.id, "PRESENT")}
-                      >
-                        <Check size={16} />
-                        {t("attendance.present")}
-                      </button>
-                      <button
-                        type="button"
-                        className="button button--ghost"
-                        onClick={() => handleMarkAttendance(enrollment.id, "ABSENT")}
-                      >
-                        <X size={16} />
-                        {t("attendance.absent")}
-                      </button>
+                <article className="attendance-roster-card" key={enrollment.id}>
+                  <div className="attendance-roster-card__head">
+                    <div>
+                      <strong>{enrollment.child?.fullName}</strong>
+                      <span>{record?.markedBy?.fullName || t("attendance.notMarkedYet")}</span>
                     </div>
-                  </td>
-                </tr>
+                    <StatusBadge status={currentStatus} />
+                  </div>
+
+                  <div className="attendance-roster-card__meta">
+                    <span>{enrollment.lesson?.title}</span>
+                    <span>
+                      {formatDate(enrollment.lesson?.date, locale)} • {enrollment.lesson?.startTime}
+                    </span>
+                  </div>
+
+                  <div className="row-actions">
+                    <button
+                      type="button"
+                      className="button button--secondary"
+                      onClick={() => handleMarkAttendance(enrollment.id, "PRESENT")}
+                      disabled={isPresentStatus(currentStatus)}
+                    >
+                      <Check size={16} />
+                      {t("attendance.present")}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button--ghost"
+                      onClick={() => handleMarkAttendance(enrollment.id, "ABSENT")}
+                      disabled={isAbsentStatus(currentStatus)}
+                    >
+                      <X size={16} />
+                      {t("attendance.absent")}
+                    </button>
+                  </div>
+                </article>
               );
             })}
-          </tbody>
-        </table>
-        {!lessonEnrollments.length ? (
+          </div>
+        ) : (
           <div className="empty-state">{t("attendance.noLessonEnrollments")}</div>
-        ) : null}
-      </div>
+        )}
+      </section>
     </div>
   );
 }

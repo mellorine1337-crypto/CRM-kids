@@ -29,7 +29,32 @@ router.get(
 
     const children = await prisma.child.findMany({
       where,
-      include: { parent: true },
+      include: {
+        parent: true,
+        enrollments: {
+          where: {
+            status: {
+              not: "CANCELLED",
+            },
+          },
+          include: {
+            lesson: true,
+            payments: {
+              include: {
+                recordedBy: true,
+                history: {
+                  include: {
+                    createdBy: true,
+                  },
+                  orderBy: { createdAt: "desc" },
+                },
+              },
+              orderBy: { createdAt: "desc" },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
+      },
       orderBy: { createdAt: "desc" },
     });
 

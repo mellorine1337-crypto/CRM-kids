@@ -41,6 +41,9 @@ export const formatRole = (role, locale = "ru") =>
 export const formatStatus = (status, locale = "ru") =>
   getMessage(locale, `statuses.${status}`) || status;
 
+export const formatPaymentMethod = (method, locale = "ru") =>
+  getMessage(locale, `paymentMethods.${method}`) || method;
+
 export const formatGender = (gender, locale = "ru") => {
   if (!gender) {
     return getMessage(locale, "genders.UNKNOWN") || "";

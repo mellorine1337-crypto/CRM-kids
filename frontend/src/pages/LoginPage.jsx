@@ -1,9 +1,11 @@
 import { Eye, EyeOff, ShieldCheck, Sparkles, Star } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth.js";
 import { useI18n } from "../hooks/useI18n.js";
 import { useToast } from "../hooks/useToast.js";
+
+const AUTH_EXPIRED_KEY = "kids-crm.authExpired";
 
 const defaultForm = {
   fullName: "",
@@ -22,6 +24,19 @@ export function LoginPage() {
   const [form, setForm] = useState(defaultForm);
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (sessionStorage.getItem(AUTH_EXPIRED_KEY) !== "1") {
+      return;
+    }
+
+    sessionStorage.removeItem(AUTH_EXPIRED_KEY);
+    showToast({
+      title: t("login.sessionExpiredTitle"),
+      description: t("login.sessionExpiredDescription"),
+      tone: "error",
+    });
+  }, [showToast, t]);
 
   if (user) {
     return <Navigate to="/" replace />;

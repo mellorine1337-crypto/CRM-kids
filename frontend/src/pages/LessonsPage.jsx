@@ -1,12 +1,30 @@
-import { Pencil, Plus, Trash2 } from "lucide-react";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
+import {
+  startTransition,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import { Modal } from "../components/Modal.jsx";
 import { PageHeader } from "../components/PageHeader.jsx";
+import { StatusBadge } from "../components/StatusBadge.jsx";
+import { LOCALE_CODE_MAP } from "../i18n/config.js";
 import { useAuth } from "../hooks/useAuth.js";
 import { useI18n } from "../hooks/useI18n.js";
 import { useToast } from "../hooks/useToast.js";
 import { formatCurrency, formatDate } from "../utils/format.js";
+import { compareLessonDateTime, isFutureOrTodayLesson } from "../utils/schedule.js";
 
 const emptyLesson = {
   title: "",
@@ -21,13 +39,77 @@ const emptyLesson = {
   price: 5000,
 };
 
+const addDays = (date, days) => {
+  const value = new Date(date);
+  value.setDate(value.getDate() + days);
+  return value;
+};
+
+const startOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
+
+const startOfWeek = (date) => {
+  const value = new Date(date);
+  const day = value.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  value.setDate(value.getDate() + diff);
+  value.setHours(0, 0, 0, 0);
+  return value;
+};
+
+const isSameDay = (left, right) =>
+  left.getFullYear() === right.getFullYear() &&
+  left.getMonth() === right.getMonth() &&
+  left.getDate() === right.getDate();
+
+const getDateKey = (value) => {
+  const date = new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getLessonAccent = (lesson) => {
+  const source = `${lesson.teacherName}-${lesson.title}`;
+  const hash = Array.from(source).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  const hue = hash % 360;
+  return {
+    "--lesson-accent": `hsl(${hue} 78% 58%)`,
+  };
+};
+
+const createParentPreviewLesson = (enrollment) => ({
+  ...enrollment.lesson,
+  childName: enrollment.child?.fullName,
+  scheduleStatus: enrollment.attendance?.status || enrollment.status,
+});
+
+const requestLessons = async ({ title, age, date }) => {
+  const params = {};
+
+  if (age) {
+    params.age = Number(age);
+  }
+
+  if (date) {
+    params.date = date;
+  }
+
+  if (title) {
+    params.title = title;
+  }
+
+  const { data } = await api.get("/lessons", { params });
+  return data.items;
+};
+
 export function LessonsPage() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
   const { showToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [lessons, setLessons] = useState([]);
-  const [children, setChildren] = useState([]);
-  const [selectedChildren, setSelectedChildren] = useState({});
+  const [parentEnrollments, setParentEnrollments] = useState([]);
   const [filters, setFilters] = useState({
     title: "",
     age: "",
@@ -35,28 +117,25 @@ export function LessonsPage() {
   });
   const [modalOpen, setModalOpen] = useState(false);
   const [editingLesson, setEditingLesson] = useState(null);
+  const [previewLesson, setPreviewLesson] = useState(null);
   const [form, setForm] = useState(emptyLesson);
+  const [viewMode, setViewMode] = useState("month");
+  const [cursorDate, setCursorDate] = useState(new Date());
   const deferredTitle = useDeferredValue(filters.title);
   const canManage = user.role !== "PARENT";
+  const localeCode = LOCALE_CODE_MAP[locale] || LOCALE_CODE_MAP.ru;
 
-  const fetchLessons = async () => {
+  const refreshLessons = useCallback(async () => {
     try {
-      const params = {};
+      const items = await requestLessons({
+        title: deferredTitle,
+        age: filters.age,
+        date: filters.date,
+      });
 
-      if (filters.age) {
-        params.age = Number(filters.age);
-      }
-
-      if (filters.date) {
-        params.date = filters.date;
-      }
-
-      if (deferredTitle) {
-        params.title = deferredTitle;
-      }
-
-      const { data } = await api.get("/lessons", { params });
-      setLessons(data.items);
+      startTransition(() => {
+        setLessons(items);
+      });
     } catch (error) {
       showToast({
         title: t("lessons.loadFailed"),
@@ -64,27 +143,59 @@ export function LessonsPage() {
         tone: "error",
       });
     }
-  };
+  }, [deferredTitle, filters.age, filters.date, showToast, t]);
 
   useEffect(() => {
-    const bootstrap = async () => {
+    if (user.role === "PARENT") {
+      return;
+    }
+
+    let cancelled = false;
+
+    const syncLessons = async () => {
       try {
-        const params = {};
+        const items = await requestLessons({
+          title: deferredTitle,
+          age: filters.age,
+          date: filters.date,
+        });
 
-        if (filters.age) {
-          params.age = Number(filters.age);
+        if (cancelled) {
+          return;
         }
 
-        if (filters.date) {
-          params.date = filters.date;
+        startTransition(() => {
+          setLessons(items);
+        });
+      } catch (error) {
+        if (cancelled) {
+          return;
         }
 
-        if (deferredTitle) {
-          params.title = deferredTitle;
-        }
+        showToast({
+          title: t("lessons.loadFailed"),
+          description: error.message,
+          tone: "error",
+        });
+      }
+    };
 
-        const { data } = await api.get("/lessons", { params });
-        setLessons(data.items);
+    void syncLessons();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deferredTitle, filters.age, filters.date, showToast, t, user.role]);
+
+  useEffect(() => {
+    if (user.role !== "PARENT") {
+      return;
+    }
+
+    const fetchParentSchedule = async () => {
+      try {
+        const { data } = await api.get("/enrollments/my");
+        setParentEnrollments(data.items);
       } catch (error) {
         showToast({
           title: t("lessons.loadFailed"),
@@ -94,35 +205,136 @@ export function LessonsPage() {
       }
     };
 
-    bootstrap();
-  }, [deferredTitle, filters.age, filters.date, showToast, t]);
+    fetchParentSchedule();
+  }, [showToast, t, user.role]);
 
   useEffect(() => {
-    if (user.role !== "PARENT") {
+    if (searchParams.get("mode") !== "create" || !canManage) {
       return;
     }
 
-    const fetchChildren = async () => {
-      try {
-        const { data } = await api.get("/children");
-        setChildren(data.items);
-      } catch (error) {
-        showToast({
-          title: t("children.loadFailed"),
-          description: error.message,
-          tone: "error",
-        });
-      }
-    };
+    startTransition(() => {
+      setEditingLesson(null);
+      setForm(emptyLesson);
+      setModalOpen(true);
+    });
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("mode");
+      return next;
+    });
+  }, [canManage, searchParams, setSearchParams]);
 
-    fetchChildren();
-  }, [showToast, t, user.role]);
+  const sortedLessons = useMemo(
+    () =>
+      [...lessons].sort((left, right) => {
+        const leftDate = new Date(left.date);
+        const rightDate = new Date(right.date);
 
-  const filteredLessons = useMemo(() => lessons, [lessons]);
+        if (leftDate.getTime() !== rightDate.getTime()) {
+          return leftDate - rightDate;
+        }
+
+        return left.startTime.localeCompare(right.startTime);
+      }),
+    [lessons],
+  );
+
+  const lessonsByDay = useMemo(() => {
+    const buckets = new Map();
+
+    for (const lesson of sortedLessons) {
+      const key = getDateKey(lesson.date);
+      const current = buckets.get(key) || [];
+      current.push(lesson);
+      buckets.set(key, current);
+    }
+
+    return buckets;
+  }, [sortedLessons]);
+
+  const monthStart = useMemo(() => startOfMonth(cursorDate), [cursorDate]);
+  const monthGridStart = useMemo(() => startOfWeek(monthStart), [monthStart]);
+  const monthDays = useMemo(
+    () => Array.from({ length: 42 }, (_, index) => addDays(monthGridStart, index)),
+    [monthGridStart],
+  );
+
+  const weekDays = useMemo(() => {
+    const start = startOfWeek(cursorDate);
+    return Array.from({ length: 7 }, (_, index) => addDays(start, index));
+  }, [cursorDate]);
+
+  const dayLessons = useMemo(
+    () => lessonsByDay.get(getDateKey(cursorDate)) || [],
+    [cursorDate, lessonsByDay],
+  );
+
+  const parentSchedule = useMemo(
+    () =>
+      parentEnrollments
+        .filter(
+          (enrollment) =>
+            enrollment.lesson && enrollment.status !== "CANCELLED",
+        )
+        .sort(compareLessonDateTime),
+    [parentEnrollments],
+  );
+
+  const parentLessonsByDay = useMemo(() => {
+    const buckets = new Map();
+
+    for (const enrollment of parentSchedule) {
+      const key = getDateKey(enrollment.lesson.date);
+      const current = buckets.get(key) || [];
+      current.push(enrollment);
+      buckets.set(key, current);
+    }
+
+    return buckets;
+  }, [parentSchedule]);
+
+  const parentDayEnrollments = useMemo(
+    () => parentLessonsByDay.get(getDateKey(cursorDate)) || [],
+    [cursorDate, parentLessonsByDay],
+  );
+
+  const weekFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(localeCode, {
+        weekday: "short",
+      }),
+    [localeCode],
+  );
+
+  const monthTitle = useMemo(
+    () =>
+      new Intl.DateTimeFormat(localeCode, {
+        month: "long",
+        year: "numeric",
+      }).format(cursorDate),
+    [cursorDate, localeCode],
+  );
+
+  const toolbarTitle = useMemo(() => {
+    if (viewMode === "month") {
+      return monthTitle;
+    }
+
+    if (viewMode === "week") {
+      return `${formatDate(weekDays[0], locale)} - ${formatDate(weekDays[6], locale)}`;
+    }
+
+    return formatDate(cursorDate, locale);
+  }, [cursorDate, locale, monthTitle, viewMode, weekDays]);
 
   const handleFilterChange = (event) => {
     const { name, value } = event.target;
     setFilters((current) => ({ ...current, [name]: value }));
+
+    if (name === "date" && value) {
+      setCursorDate(new Date(`${value}T12:00:00`));
+    }
   };
 
   const openCreate = () => {
@@ -178,7 +390,7 @@ export function LessonsPage() {
         await api.post("/lessons", payload);
       }
 
-      await fetchLessons();
+      await refreshLessons();
       resetModal();
       showToast({
         title: editingLesson
@@ -203,7 +415,8 @@ export function LessonsPage() {
 
     try {
       await api.delete(`/lessons/${lesson.id}`);
-      await fetchLessons();
+      setPreviewLesson(null);
+      await refreshLessons();
       showToast({
         title: t("lessons.removed"),
         description: t("lessons.removedDescription", { name: lesson.title }),
@@ -218,34 +431,255 @@ export function LessonsPage() {
     }
   };
 
-  const handleBookLesson = async (lessonId) => {
-    const childId = selectedChildren[lessonId] || children[0]?.id;
+  const navigatePeriod = (direction) => {
+    setCursorDate((current) => {
+      if (viewMode === "month") {
+        return new Date(current.getFullYear(), current.getMonth() + direction, 1);
+      }
 
-    if (!childId) {
-      showToast({
-        title: t("lessons.addChildFirst"),
-        description: t("lessons.addChildFirstDescription"),
-        tone: "error",
-      });
-      return;
-    }
+      if (viewMode === "week") {
+        return addDays(current, 7 * direction);
+      }
 
-    try {
-      await api.post("/enrollments", { childId, lessonId });
-      showToast({
-        title: t("lessons.enrollmentConfirmed"),
-        description: t("lessons.enrollmentConfirmedDescription"),
-        tone: "success",
-      });
-      await fetchLessons();
-    } catch (error) {
-      showToast({
-        title: t("lessons.bookingFailed"),
-        description: error.message,
-        tone: "error",
-      });
-    }
+      return addDays(current, direction);
+    });
   };
+
+  const handleMoreDay = (date) => {
+    setCursorDate(date);
+    setViewMode("day");
+  };
+
+  const renderLessonEntry = (lesson) => (
+    <button
+      key={lesson.id}
+      type="button"
+      className="schedule-entry"
+      style={getLessonAccent(lesson)}
+      onClick={() => setPreviewLesson(lesson)}
+      title={`${lesson.startTime} ${lesson.title}`}
+    >
+      <span className="schedule-entry__dot" />
+      <span className="schedule-entry__time">{lesson.startTime}</span>
+      <span className="schedule-entry__title">{lesson.title}</span>
+      <span className="schedule-entry__count">
+        {`${lesson.capacity - lesson.availableSpots}/${lesson.capacity}`}
+      </span>
+    </button>
+  );
+
+  const renderParentLessonEntry = (enrollment) => {
+    const lesson = enrollment.lesson;
+    const childShortName = enrollment.child?.fullName?.split(" ")[0] || "";
+
+    return (
+      <button
+        key={enrollment.id}
+        type="button"
+        className="schedule-entry"
+        style={getLessonAccent(lesson)}
+        onClick={() => setPreviewLesson(createParentPreviewLesson(enrollment))}
+        title={`${lesson.startTime} ${lesson.title}`}
+      >
+        <span className="schedule-entry__dot" />
+        <span className="schedule-entry__time">{lesson.startTime}</span>
+        <span className="schedule-entry__title">{lesson.title}</span>
+        <span className="schedule-entry__count">{childShortName}</span>
+      </button>
+    );
+  };
+
+  if (user.role === "PARENT") {
+    return (
+      <div className="stack-xl">
+        <PageHeader
+          title={t("lessons.parentTitle")}
+          description={t("lessons.parentDescription")}
+        />
+
+        <section className="panel schedule-panel">
+          <div className="schedule-toolbar">
+            <div className="schedule-toolbar__nav">
+              <button
+                type="button"
+                className="button button--primary"
+                onClick={() => navigatePeriod(-1)}
+              >
+                <ChevronLeft size={16} />
+                {t("lessons.prev")}
+              </button>
+              <button
+                type="button"
+                className="button button--secondary"
+                onClick={() => {
+                  setCursorDate(new Date());
+                  setViewMode("day");
+                }}
+              >
+                {t("lessons.today")}
+              </button>
+              <button
+                type="button"
+                className="button button--primary"
+                onClick={() => navigatePeriod(1)}
+              >
+                {t("lessons.next")}
+                <ChevronRight size={16} />
+              </button>
+            </div>
+
+            <strong className="schedule-toolbar__title">{toolbarTitle}</strong>
+
+            <div className="schedule-toolbar__views">
+              {["month", "day"].map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={
+                    viewMode === mode
+                      ? "button button--primary"
+                      : "button button--secondary"
+                  }
+                  onClick={() => {
+                    setViewMode(mode);
+
+                    if (mode === "day") {
+                      setCursorDate(new Date());
+                    }
+                  }}
+                >
+                  {t(`lessons.view${mode.charAt(0).toUpperCase()}${mode.slice(1)}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {parentSchedule.length ? (
+            <>
+              {viewMode === "month" ? (
+                <div className="schedule-calendar">
+                  <div className="schedule-weekdays">
+                    {weekDays.map((day) => (
+                      <div className="schedule-weekdays__item" key={day.toISOString()}>
+                        {weekFormatter.format(day).replace(".", "")}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="schedule-grid">
+                    {monthDays.map((day) => {
+                      const dayKey = getDateKey(day);
+                      const dayEnrollments = parentLessonsByDay.get(dayKey) || [];
+                      const visibleEnrollments = dayEnrollments.slice(0, 4);
+                      const hiddenCount = Math.max(dayEnrollments.length - visibleEnrollments.length, 0);
+
+                      return (
+                        <article
+                          key={dayKey}
+                          className={[
+                            "schedule-cell",
+                            day.getMonth() !== cursorDate.getMonth() ? "schedule-cell--muted" : "",
+                            isSameDay(day, new Date()) ? "schedule-cell--today" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          <div className="schedule-cell__head">
+                            <button
+                              type="button"
+                              className="schedule-cell__date"
+                              onClick={() => handleMoreDay(day)}
+                            >
+                              {day.getDate()}
+                            </button>
+                            {dayEnrollments.length ? <span>{dayEnrollments.length}</span> : null}
+                          </div>
+
+                          <div className="schedule-cell__events">
+                            {visibleEnrollments.map(renderParentLessonEntry)}
+                            {hiddenCount ? (
+                              <button
+                                type="button"
+                                className="schedule-more"
+                                onClick={() => handleMoreDay(day)}
+                              >
+                                {t("lessons.moreItems", { count: hiddenCount })}
+                              </button>
+                            ) : null}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {viewMode === "day" ? (
+                <div className="schedule-day-view">
+                  <div className="schedule-day-view__head">
+                    <div>
+                      <h2>{formatDate(cursorDate, locale)}</h2>
+                      <p>{t("lessons.daySummary", { count: parentDayEnrollments.length })}</p>
+                    </div>
+                    <CalendarDays size={18} />
+                  </div>
+
+                  {parentDayEnrollments.length ? (
+                    <div className="schedule-day-view__list">
+                      {parentDayEnrollments.map((enrollment) => (
+                        <article className="schedule-day-card" key={enrollment.id}>
+                          <div className="schedule-day-card__head">
+                            <div>
+                              <strong>{enrollment.lesson.title}</strong>
+                              <span>
+                                {enrollment.lesson.startTime} - {enrollment.lesson.endTime}
+                              </span>
+                            </div>
+                            <StatusBadge
+                              status={enrollment.attendance?.status || enrollment.status}
+                            />
+                          </div>
+                          <div className="lesson-card__meta">
+                            <span>{enrollment.child?.fullName}</span>
+                            <span>
+                              {t("lessons.teacher", {
+                                name: enrollment.lesson.teacherName,
+                              })}
+                            </span>
+                            <span>{enrollment.lesson.description || t("lessons.noDescription")}</span>
+                            {isFutureOrTodayLesson(enrollment) ? (
+                              <span className="parent-schedule-chip">
+                                {t("lessons.parentUpcomingLabel")}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="row-actions">
+                            <button
+                              type="button"
+                              className="button button--secondary"
+                              onClick={() =>
+                                setPreviewLesson(createParentPreviewLesson(enrollment))
+                              }
+                            >
+                              {t("lessons.openLesson")}
+                            </button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="empty-state">{t("lessons.noLessonsForPeriod")}</div>
+                  )}
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div className="empty-state">{t("lessons.parentEmpty")}</div>
+          )}
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="stack-xl">
@@ -299,69 +733,255 @@ export function LessonsPage() {
         </label>
       </section>
 
-      <section className="card-grid">
-        {filteredLessons.map((lesson) => (
-          <article className="lesson-card" key={lesson.id}>
-            <div className="lesson-card__head">
-              <div>
-                <h2>{lesson.title}</h2>
-                <p>{lesson.description || t("lessons.noDescription")}</p>
-              </div>
-              <span className="lesson-card__price">
-                {formatCurrency(lesson.price, lesson.currency || "KZT", locale)}
-              </span>
-            </div>
-            <div className="lesson-card__meta">
-              <span>{formatDate(lesson.date, locale)}</span>
-              <span>
-                {lesson.startTime} - {lesson.endTime}
-              </span>
-              <span>
-                {t("lessons.ageRange", {
-                  min: lesson.ageMin,
-                  max: lesson.ageMax,
-                })}
-              </span>
-              <span>{t("lessons.teacher", { name: lesson.teacherName })}</span>
-              <span>
-                {t("lessons.seatsLeft", {
-                  available: lesson.availableSpots,
-                  capacity: lesson.capacity,
-                })}
-              </span>
+      <section className="panel schedule-panel">
+        <div className="schedule-toolbar">
+          <div className="schedule-toolbar__nav">
+            <button
+              type="button"
+              className="button button--primary"
+              onClick={() => navigatePeriod(-1)}
+            >
+              <ChevronLeft size={16} />
+              {t("lessons.prev")}
+            </button>
+            <button
+              type="button"
+              className="button button--secondary"
+              onClick={() => setCursorDate(new Date())}
+            >
+              {t("lessons.today")}
+            </button>
+            <button
+              type="button"
+              className="button button--primary"
+              onClick={() => navigatePeriod(1)}
+            >
+              {t("lessons.next")}
+              <ChevronRight size={16} />
+            </button>
+          </div>
+
+          <strong className="schedule-toolbar__title">{toolbarTitle}</strong>
+
+          <div className="schedule-toolbar__views">
+            {["month", "week", "day"].map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                className={
+                  viewMode === mode
+                    ? "button button--primary"
+                    : "button button--secondary"
+                }
+                onClick={() => setViewMode(mode)}
+              >
+                {t(`lessons.view${mode.charAt(0).toUpperCase()}${mode.slice(1)}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {viewMode === "month" ? (
+          <div className="schedule-calendar">
+            <div className="schedule-weekdays">
+              {weekDays.map((day) => (
+                <div className="schedule-weekdays__item" key={day.toISOString()}>
+                  {weekFormatter.format(day).replace(".", "")}
+                </div>
+              ))}
             </div>
 
-            {user.role === "PARENT" ? (
-              <div className="booking-box">
-                <select
-                  value={selectedChildren[lesson.id] || children[0]?.id || ""}
-                  onChange={(event) =>
-                    setSelectedChildren((current) => ({
-                      ...current,
-                      [lesson.id]: event.target.value,
-                    }))
-                  }
+            <div className="schedule-grid">
+              {monthDays.map((day) => {
+                const dayKey = getDateKey(day);
+                const dayLessonsForCell = lessonsByDay.get(dayKey) || [];
+                const visibleLessons = dayLessonsForCell.slice(0, 5);
+                const hiddenCount = Math.max(dayLessonsForCell.length - visibleLessons.length, 0);
+
+                return (
+                  <article
+                    key={dayKey}
+                    className={[
+                      "schedule-cell",
+                      day.getMonth() !== cursorDate.getMonth() ? "schedule-cell--muted" : "",
+                      isSameDay(day, new Date()) ? "schedule-cell--today" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    <div className="schedule-cell__head">
+                      <button
+                        type="button"
+                        className="schedule-cell__date"
+                        onClick={() => handleMoreDay(day)}
+                      >
+                        {day.getDate()}
+                      </button>
+                      {dayLessonsForCell.length ? <span>{dayLessonsForCell.length}</span> : null}
+                    </div>
+
+                    <div className="schedule-cell__events">
+                      {visibleLessons.map(renderLessonEntry)}
+                      {hiddenCount ? (
+                        <button
+                          type="button"
+                          className="schedule-more"
+                          onClick={() => handleMoreDay(day)}
+                        >
+                          {t("lessons.moreItems", { count: hiddenCount })}
+                        </button>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        {viewMode === "week" ? (
+          <div className="schedule-week-view">
+            {weekDays.map((day) => {
+              const lessonsForDay = lessonsByDay.get(getDateKey(day)) || [];
+
+              return (
+                <article
+                  key={day.toISOString()}
+                  className={`schedule-column ${isSameDay(day, new Date()) ? "schedule-column--today" : ""}`}
                 >
-                  {children.map((child) => (
-                    <option value={child.id} key={child.id}>
-                      {child.fullName}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="button button--primary"
-                  onClick={() => handleBookLesson(lesson.id)}
-                >
-                  {t("lessons.bookLesson")}
-                </button>
+                  <div className="schedule-column__head">
+                    <strong>{weekFormatter.format(day).replace(".", "")}</strong>
+                    <span>{formatDate(day, locale)}</span>
+                  </div>
+                  <div className="schedule-column__body">
+                    {lessonsForDay.length ? (
+                      lessonsForDay.map(renderLessonEntry)
+                    ) : (
+                      <div className="empty-state empty-state--compact">
+                        {t("lessons.noLessonsForPeriod")}
+                      </div>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {viewMode === "day" ? (
+          <div className="schedule-day-view">
+            <div className="schedule-day-view__head">
+              <div>
+                <h2>{formatDate(cursorDate, locale)}</h2>
+                <p>{t("lessons.daySummary", { count: dayLessons.length })}</p>
+              </div>
+              <CalendarDays size={18} />
+            </div>
+
+            {dayLessons.length ? (
+              <div className="schedule-day-view__list">
+                {dayLessons.map((lesson) => (
+                  <article className="schedule-day-card" key={lesson.id}>
+                    <div className="schedule-day-card__head">
+                      <div>
+                        <strong>{lesson.title}</strong>
+                        <span>
+                          {lesson.startTime} - {lesson.endTime}
+                        </span>
+                      </div>
+                      <span className="lesson-card__price">
+                        {formatCurrency(lesson.price, lesson.currency || "KZT", locale)}
+                      </span>
+                    </div>
+                    <div className="lesson-card__meta">
+                      <span>{lesson.description || t("lessons.noDescription")}</span>
+                      <span>{t("lessons.teacher", { name: lesson.teacherName })}</span>
+                      <span>
+                        {t("lessons.ageRange", {
+                          min: lesson.ageMin,
+                          max: lesson.ageMax,
+                        })}
+                      </span>
+                      <span>
+                        {t("lessons.seatsLeft", {
+                          available: lesson.availableSpots,
+                          capacity: lesson.capacity,
+                        })}
+                      </span>
+                    </div>
+                    <div className="row-actions">
+                      <button
+                        type="button"
+                        className="button button--secondary"
+                        onClick={() => setPreviewLesson(lesson)}
+                      >
+                        {t("lessons.openLesson")}
+                      </button>
+                    </div>
+                  </article>
+                ))}
               </div>
             ) : (
+              <div className="empty-state">{t("lessons.noLessonsForPeriod")}</div>
+            )}
+          </div>
+        ) : null}
+      </section>
+
+      <Modal
+        open={Boolean(previewLesson)}
+        title={previewLesson?.title || t("lessons.lessonDetails")}
+        onClose={() => setPreviewLesson(null)}
+      >
+        {previewLesson ? (
+          <div className="stack-lg">
+            <div className="detail-grid">
+              {previewLesson.childName ? (
+                <div className="detail-card">
+                  <span>{t("enrollments.child")}</span>
+                  <strong>{previewLesson.childName}</strong>
+                </div>
+              ) : null}
+              {previewLesson.scheduleStatus ? (
+                <div className="detail-card">
+                  <span>{t("enrollments.status")}</span>
+                  <StatusBadge status={previewLesson.scheduleStatus} />
+                </div>
+              ) : null}
+              <div className="detail-card">
+                <span>{t("lessons.date")}</span>
+                <strong>{formatDate(previewLesson.date, locale)}</strong>
+              </div>
+              <div className="detail-card">
+                <span>{t("lessons.timeLabel")}</span>
+                <strong>{`${previewLesson.startTime} - ${previewLesson.endTime}`}</strong>
+              </div>
+              <div className="detail-card">
+                <span>{t("lessons.teacherField")}</span>
+                <strong>{previewLesson.teacherName}</strong>
+              </div>
+              <div className="detail-card">
+                <span>{t("lessons.price")}</span>
+                <strong>
+                  {formatCurrency(previewLesson.price, previewLesson.currency || "KZT", locale)}
+                </strong>
+              </div>
+            </div>
+
+            <div className="detail-card detail-card--highlight">
+              <span>{t("lessons.descriptionField")}</span>
+              <p>{previewLesson.description || t("lessons.noDescription")}</p>
+            </div>
+
+            {user.role !== "PARENT" ? (
               <div className="row-actions">
                 <button
                   type="button"
                   className="button button--secondary"
-                  onClick={() => openEdit(lesson)}
+                  onClick={() => {
+                    setPreviewLesson(null);
+                    openEdit(previewLesson);
+                  }}
                 >
                   <Pencil size={16} />
                   {t("common.edit")}
@@ -369,16 +989,16 @@ export function LessonsPage() {
                 <button
                   type="button"
                   className="button button--ghost"
-                  onClick={() => handleDeleteLesson(lesson)}
+                  onClick={() => handleDeleteLesson(previewLesson)}
                 >
                   <Trash2 size={16} />
                   {t("common.delete")}
                 </button>
               </div>
-            )}
-          </article>
-        ))}
-      </section>
+            ) : null}
+          </div>
+        ) : null}
+      </Modal>
 
       <Modal
         open={modalOpen}

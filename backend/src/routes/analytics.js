@@ -1,5 +1,6 @@
 const express = require("express");
 const { prisma } = require("../lib/prisma");
+const { buildEnrollmentFinancials } = require("../lib/finance");
 const { buildChildRecommendations } = require("../lib/recommendations");
 const { requireAuth, requireRoles } = require("../middleware/auth");
 const { asyncHandler } = require("../utils/async-handler");
@@ -18,6 +19,8 @@ router.get(
     const now = new Date();
     const todayStart = new Date(now);
     todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
 
     const monthStart = getMonthStart(now.getFullYear(), now.getMonth());
     const sixMonthsStart = getMonthStart(now.getFullYear(), now.getMonth() - 5);
@@ -28,17 +31,27 @@ router.get(
       parentsCount,
       childrenCount,
       totalLessonsCount,
+      todayLessonsCount,
       upcomingLessons,
       enrollments,
       payments,
       attendanceRecords,
       recentParentsCount,
+      staffUsers,
     ] = await Promise.all([
       prisma.user.count({
         where: { role: "PARENT" },
       }),
       prisma.child.count(),
       prisma.lesson.count(),
+      prisma.lesson.count({
+        where: {
+          date: {
+            gte: todayStart,
+            lte: todayEnd,
+          },
+        },
+      }),
       prisma.lesson.findMany({
         where: {
           date: { gte: todayStart },
@@ -76,6 +89,7 @@ router.get(
               status: true,
               amount: true,
               createdAt: true,
+              paidAt: true,
             },
           },
           attendance: {
@@ -101,12 +115,18 @@ router.get(
           createdAt: { gte: sixMonthsStart },
         },
         include: {
+          recordedBy: true,
           enrollment: {
             include: {
               lesson: {
                 select: {
                   id: true,
                   title: true,
+                },
+              },
+              child: {
+                select: {
+                  id: true,
                 },
               },
             },
@@ -128,11 +148,23 @@ router.get(
           createdAt: { gte: last30Days },
         },
       }),
+      prisma.user.findMany({
+        where: {
+          role: "STAFF",
+        },
+        select: {
+          id: true,
+          fullName: true,
+        },
+      }),
     ]);
 
     const activeEnrollments = enrollments.filter(
       (enrollment) => enrollment.status !== "CANCELLED",
     );
+    const activeStudentsCount = new Set(
+      activeEnrollments.map((enrollment) => enrollment.childId),
+    ).size;
     const bookedEnrollments = enrollments.filter(
       (enrollment) => enrollment.status === "BOOKED",
     );
@@ -143,8 +175,11 @@ router.get(
       (enrollment) => enrollment.status === "MISSED",
     );
     const unpaidEnrollments = activeEnrollments.filter(
-      (enrollment) =>
-        !enrollment.payments.some((payment) => payment.status === "SUCCEEDED"),
+      (enrollment) => buildEnrollmentFinancials(enrollment).debt > 0,
+    );
+    const totalDebt = activeEnrollments.reduce(
+      (sum, enrollment) => sum + buildEnrollmentFinancials(enrollment).debt,
+      0,
     );
 
     const presentAttendance = attendanceRecords.filter(
@@ -161,6 +196,9 @@ router.get(
     const succeededPayments = payments.filter(
       (payment) => payment.status === "SUCCEEDED",
     );
+    const partialPayments = payments.filter(
+      (payment) => payment.status === "PARTIAL",
+    );
     const pendingPayments = payments.filter(
       (payment) => payment.status === "PENDING",
     );
@@ -171,20 +209,31 @@ router.get(
       (payment) => payment.status === "CANCELLED",
     );
 
-    const totalRevenue = succeededPayments.reduce(
+    const settledPayments = payments.filter((payment) =>
+      ["SUCCEEDED", "PARTIAL"].includes(payment.status),
+    );
+
+    const totalRevenue = settledPayments.reduce(
       (sum, payment) => sum + Number(payment.amount),
       0,
     );
-    const monthRevenue = succeededPayments
-      .filter((payment) => payment.createdAt >= monthStart)
+    const monthRevenue = settledPayments
+      .filter((payment) => (payment.paidAt || payment.createdAt) >= monthStart)
+      .reduce((sum, payment) => sum + Number(payment.amount), 0);
+    const todayRevenue = settledPayments
+      .filter((payment) => {
+        const paymentDate = payment.paidAt || payment.createdAt;
+        return paymentDate >= todayStart && paymentDate <= todayEnd;
+      })
       .reduce((sum, payment) => sum + Number(payment.amount), 0);
 
     const revenueByMonth = Array.from({ length: 6 }, (_, index) => {
       const cursor = getMonthStart(now.getFullYear(), now.getMonth() - (5 - index));
       const nextCursor = getMonthStart(cursor.getFullYear(), cursor.getMonth() + 1);
-      const monthPayments = succeededPayments.filter(
-        (payment) => payment.createdAt >= cursor && payment.createdAt < nextCursor,
-      );
+      const monthPayments = settledPayments.filter((payment) => {
+        const paymentDate = payment.paidAt || payment.createdAt;
+        return paymentDate >= cursor && paymentDate < nextCursor;
+      });
 
       return {
         key: `${cursor.getFullYear()}-${cursor.getMonth() + 1}`,
@@ -196,6 +245,83 @@ router.get(
         paymentsCount: monthPayments.length,
       };
     });
+
+    const todayEnrollments = activeEnrollments.filter((enrollment) => {
+      const lessonDate = new Date(enrollment.lesson?.date);
+      return lessonDate >= todayStart && lessonDate <= todayEnd;
+    });
+
+    const attendanceToday = todayEnrollments.reduce(
+      (summary, enrollment) => {
+        if (
+          enrollment.attendance?.status === "PRESENT" ||
+          enrollment.status === "ATTENDED"
+        ) {
+          summary.present += 1;
+        } else if (
+          enrollment.attendance?.status === "ABSENT" ||
+          enrollment.status === "MISSED"
+        ) {
+          summary.absent += 1;
+        } else {
+          summary.expected += 1;
+        }
+
+        return summary;
+      },
+      {
+        present: 0,
+        expected: 0,
+        absent: 0,
+      },
+    );
+
+    const bestStaffMonthMap = new Map(
+      staffUsers.map((staff) => [
+        staff.id,
+        {
+          id: staff.id,
+          fullName: staff.fullName,
+          revenue: 0,
+          childIds: new Set(),
+        },
+      ]),
+    );
+
+    for (const payment of settledPayments) {
+      const paymentDate = payment.paidAt || payment.createdAt;
+
+      if (
+        !payment.recordedById ||
+        paymentDate < monthStart ||
+        !bestStaffMonthMap.has(payment.recordedById)
+      ) {
+        continue;
+      }
+
+      const staff = bestStaffMonthMap.get(payment.recordedById);
+      staff.revenue += Number(payment.amount);
+
+      if (payment.enrollment?.child?.id) {
+        staff.childIds.add(payment.enrollment.child.id);
+      }
+    }
+
+    const bestStaffMonth =
+      Array.from(bestStaffMonthMap.values())
+        .map((staff) => ({
+          id: staff.id,
+          fullName: staff.fullName,
+          revenue: staff.revenue,
+          activeStudentsCount: staff.childIds.size,
+        }))
+        .sort((left, right) => {
+          if (right.revenue !== left.revenue) {
+            return right.revenue - left.revenue;
+          }
+
+          return right.activeStudentsCount - left.activeStudentsCount;
+        })[0] || null;
 
     const lessonStatsMap = new Map();
 
@@ -253,8 +379,8 @@ router.get(
     const bookedLast30Days = enrollments.filter(
       (enrollment) => enrollment.createdAt >= last30Days,
     ).length;
-    const paidLast30Days = succeededPayments.filter(
-      (payment) => payment.createdAt >= last30Days,
+    const paidLast30Days = settledPayments.filter(
+      (payment) => (payment.paidAt || payment.createdAt) >= last30Days,
     ).length;
     const attendedLast30Days = attendanceRecords.filter(
       (record) => record.status === "PRESENT" && record.markedAt >= last30Days,
@@ -306,8 +432,8 @@ router.get(
         stats.scoreCount += 1;
       }
 
-      const successfulPayments = enrollment.payments.filter(
-        (payment) => payment.status === "SUCCEEDED",
+      const successfulPayments = enrollment.payments.filter((payment) =>
+        ["SUCCEEDED", "PARTIAL"].includes(payment.status),
       );
 
       if (successfulPayments.length) {
@@ -428,11 +554,15 @@ router.get(
         parentsCount,
         childrenCount,
         totalLessonsCount,
+        todayLessonsCount,
         upcomingLessonsCount: upcomingLoad.length,
         activeEnrollmentsCount: activeEnrollments.length,
+        activeStudentsCount,
         bookedEnrollmentsCount: bookedEnrollments.length,
+        todayRevenue,
         monthRevenue,
         totalRevenue,
+        totalDebt,
         attendanceRate,
         unpaidEnrollmentsCount: unpaidEnrollments.length,
         missedEnrollmentsCount: missedEnrollments.length,
@@ -451,8 +581,10 @@ router.get(
         missedEnrollmentsCount: missedEnrollments.length,
         rate: attendanceRate,
       },
+      attendanceToday,
       payments: {
         pendingCount: pendingPayments.length,
+        partialCount: partialPayments.length,
         succeededCount: succeededPayments.length,
         failedCount: failedPayments.length,
         cancelledCount: cancelledPayments.length,
@@ -470,6 +602,7 @@ router.get(
         missedEnrollmentsCount: missedEnrollments.length,
         pendingPaymentsCount: pendingPayments.length,
       },
+      bestStaffMonth,
       generatedAt: now.toISOString(),
     });
   }),

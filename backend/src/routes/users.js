@@ -11,6 +11,7 @@ const {
   optionalPhoneSchema,
   passwordSchema,
 } = require("../utils/validation");
+const { requireRoles } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -32,6 +33,23 @@ router.get(
   asyncHandler(async (req, res) => {
     res.json({
       user: serializeUser(req.user),
+    });
+  }),
+);
+
+router.get(
+  "/parents",
+  requireRoles("STAFF"),
+  asyncHandler(async (_req, res) => {
+    const parents = await prisma.user.findMany({
+      where: {
+        role: "PARENT",
+      },
+      orderBy: { fullName: "asc" },
+    });
+
+    res.json({
+      items: parents.map(serializeUser),
     });
   }),
 );

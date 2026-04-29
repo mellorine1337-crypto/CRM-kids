@@ -6,14 +6,31 @@ const hashToken = (value) =>
   crypto.createHash("sha256").update(value).digest("hex");
 
 const signAccessToken = (user) =>
-  jwt.sign({ sub: user.id, role: user.role, email: user.email }, env.jwt.accessSecret, {
-    expiresIn: env.jwt.accessTtl,
-  });
+  jwt.sign(
+    {
+      sub: user.id,
+      role: user.role,
+      email: user.email,
+      jti: crypto.randomUUID(),
+    },
+    env.jwt.accessSecret,
+    {
+      expiresIn: env.jwt.accessTtl,
+    },
+  );
 
 const signRefreshToken = (user) =>
-  jwt.sign({ sub: user.id, role: user.role }, env.jwt.refreshSecret, {
-    expiresIn: `${env.jwt.refreshTtlDays}d`,
-  });
+  jwt.sign(
+    {
+      sub: user.id,
+      role: user.role,
+      jti: crypto.randomUUID(),
+    },
+    env.jwt.refreshSecret,
+    {
+      expiresIn: `${env.jwt.refreshTtlDays}d`,
+    },
+  );
 
 const signAttendanceQrToken = (enrollment) =>
   jwt.sign(

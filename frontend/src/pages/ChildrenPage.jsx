@@ -1,14 +1,22 @@
 import { Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import { Modal } from "../components/Modal.jsx";
 import { PageHeader } from "../components/PageHeader.jsx";
+import { StatusBadge } from "../components/StatusBadge.jsx";
 import { useAuth } from "../hooks/useAuth.js";
 import { useI18n } from "../hooks/useI18n.js";
 import { useToast } from "../hooks/useToast.js";
-import { formatDate, formatGender, resolveAssetUrl } from "../utils/format.js";
+import {
+  formatCurrency,
+  formatDate,
+  formatGender,
+  resolveAssetUrl,
+} from "../utils/format.js";
 
 const emptyForm = {
+  parentId: "",
   fullName: "",
   birthDate: "",
   gender: "",
@@ -19,13 +27,17 @@ export function ChildrenPage() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
   const { showToast } = useToast();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [children, setChildren] = useState([]);
+  const [parents, setParents] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingChild, setEditingChild] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const canCreate = user.role === "PARENT";
+  const [onlyDebtors, setOnlyDebtors] = useState(false);
+  const canCreate = true;
 
   const loadChildren = async () => {
     try {
@@ -45,8 +57,15 @@ export function ChildrenPage() {
   useEffect(() => {
     const bootstrap = async () => {
       try {
-        const { data } = await api.get("/children");
-        setChildren(data.items);
+        const requests = [api.get("/children")];
+
+        if (user.role === "STAFF") {
+          requests.push(api.get("/users/parents"));
+        }
+
+        const [childrenResponse, parentsResponse] = await Promise.all(requests);
+        setChildren(childrenResponse.data.items);
+        setParents(parentsResponse?.data?.items || []);
       } catch (error) {
         showToast({
           title: t("children.loadFailed"),
@@ -59,7 +78,26 @@ export function ChildrenPage() {
     };
 
     bootstrap();
-  }, [showToast, t]);
+  }, [showToast, t, user.role]);
+
+  useEffect(() => {
+    if (searchParams.get("mode") !== "create") {
+      return;
+    }
+
+    setEditingChild(null);
+    setForm({
+      ...emptyForm,
+      parentId: user.role === "STAFF" ? parents[0]?.id || "" : "",
+    });
+    setFile(null);
+    setModalOpen(true);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("mode");
+      return next;
+    });
+  }, [parents, searchParams, setSearchParams, user.role]);
 
   const resetModal = () => {
     setEditingChild(null);
@@ -70,7 +108,10 @@ export function ChildrenPage() {
 
   const openCreate = () => {
     setEditingChild(null);
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      parentId: user.role === "STAFF" ? parents[0]?.id || "" : "",
+    });
     setFile(null);
     setModalOpen(true);
   };
@@ -78,6 +119,7 @@ export function ChildrenPage() {
   const openEdit = (child) => {
     setEditingChild(child);
     setForm({
+      parentId: child.parentId || "",
       fullName: child.fullName,
       birthDate: child.birthDate.slice(0, 10),
       gender: child.gender || "",
@@ -110,7 +152,17 @@ export function ChildrenPage() {
     event.preventDefault();
 
     try {
+      if (user.role === "STAFF" && !form.parentId) {
+        showToast({
+          title: t("children.saveFailed"),
+          description: t("children.parentRequired"),
+          tone: "error",
+        });
+        return;
+      }
+
       const payload = {
+        parentId: user.role === "STAFF" ? form.parentId : undefined,
         fullName: form.fullName,
         birthDate: new Date(form.birthDate).toISOString(),
         gender: form.gender || undefined,
@@ -162,6 +214,10 @@ export function ChildrenPage() {
     }
   };
 
+  const filteredChildren = onlyDebtors
+    ? children.filter((child) => Number(child.financials?.debt || 0) > 0)
+    : children;
+
   return (
     <div className="stack-xl">
       <PageHeader
@@ -181,11 +237,21 @@ export function ChildrenPage() {
         }
       />
 
+      <div className="row-actions">
+        <button
+          type="button"
+          className={onlyDebtors ? "button button--primary" : "button button--secondary"}
+          onClick={() => setOnlyDebtors((current) => !current)}
+        >
+          {t("children.onlyDebtors")}
+        </button>
+      </div>
+
       {loading ? (
         <div className="empty-state">{t("children.loading")}</div>
-      ) : children.length ? (
+      ) : filteredChildren.length ? (
         <section className="card-grid">
-          {children.map((child) => {
+          {filteredChildren.map((child) => {
             const photo = resolveAssetUrl(child.profileImageUrl);
             return (
               <article className="child-card" key={child.id}>
@@ -222,6 +288,30 @@ export function ChildrenPage() {
                     </span>
                   ) : null}
                 </div>
+                <div className="detail-grid">
+                  <div className="detail-card">
+                    <span>{t("children.accrued")}</span>
+                    <strong>
+                      {formatCurrency(child.financials?.accrued || 0, "kzt", locale)}
+                    </strong>
+                  </div>
+                  <div className="detail-card">
+                    <span>{t("children.paid")}</span>
+                    <strong>
+                      {formatCurrency(child.financials?.paid || 0, "kzt", locale)}
+                    </strong>
+                  </div>
+                  <div className="detail-card">
+                    <span>{t("children.debt")}</span>
+                    <strong>
+                      {formatCurrency(child.financials?.debt || 0, "kzt", locale)}
+                    </strong>
+                  </div>
+                  <div className="detail-card">
+                    <span>{t("children.financeStatus")}</span>
+                    <StatusBadge status={child.financials?.balanceStatus || "PENDING"} />
+                  </div>
+                </div>
                 <div className="row-actions">
                   <button
                     type="button"
@@ -239,6 +329,15 @@ export function ChildrenPage() {
                     <Trash2 size={16} />
                     {t("common.delete")}
                   </button>
+                  {Number(child.financials?.debt || 0) > 0 ? (
+                    <button
+                      type="button"
+                      className="button button--primary"
+                      onClick={() => navigate(`/payments?mode=accept&childId=${child.id}`)}
+                    >
+                      {t("children.payAction")}
+                    </button>
+                  ) : null}
                 </div>
               </article>
             );
@@ -254,6 +353,24 @@ export function ChildrenPage() {
         onClose={resetModal}
       >
         <form className="stack-lg" onSubmit={handleSubmit}>
+          {user.role === "STAFF" ? (
+            <label className="field">
+              <span>{t("children.parentLabel")}</span>
+              <select
+                name="parentId"
+                value={form.parentId}
+                onChange={handleChange}
+                required
+              >
+                <option value="">{t("children.selectParent")}</option>
+                {parents.map((parent) => (
+                  <option key={parent.id} value={parent.id}>
+                    {parent.fullName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <label className="field">
             <span>{t("children.fullName")}</span>
             <input

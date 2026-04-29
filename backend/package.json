@@ -30,6 +30,7 @@
     "prisma": "6.16.2",
     "stripe": "^20.4.1",
     "swagger-ui-express": "^5.0.1",
+    "xlsx": "^0.18.5",
     "yamljs": "^0.3.0",
     "zod": "^4.3.6"
   },

@@ -2,11 +2,8 @@
 @import "./styles/app.css";
 
 :root {
-  color: #1f2937;
-  background:
-    radial-gradient(circle at top left, rgba(79, 142, 247, 0.22), transparent 30%),
-    radial-gradient(circle at top right, rgba(107, 209, 168, 0.18), transparent 28%),
-    linear-gradient(180deg, #f7f9fc 0%, #eef4fb 100%);
+  color: #111827;
+  background: #f8fafc;
   font-family: "Inter", "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -27,6 +24,7 @@ body,
 
 body {
   min-width: 1024px;
+  background: #f8fafc;
 }
 
 button,
