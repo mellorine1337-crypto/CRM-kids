@@ -138,3 +138,4 @@ Frontend:
 - Архитектурные заметки: [docs/architecture.md](/Users/alpa/CRM--JS/docs/architecture.md)
 - Карта проекта: [docs/code-map.md](/Users/alpa/CRM--JS/docs/code-map.md)
 - Гайд для защиты: [docs/defense-guide.md](/Users/alpa/CRM--JS/docs/defense-guide.md)
+# CRM-kids
