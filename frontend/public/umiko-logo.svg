@@ -1,0 +1,41 @@
+<svg width="760" height="180" viewBox="0 0 760 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="umikoBlueWide" x1="20" y1="18" x2="560" y2="160" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#37ABF5" />
+      <stop offset="1" stop-color="#1D4ED8" />
+    </linearGradient>
+  </defs>
+  <g transform="translate(18 12)">
+    <path
+      d="M28 28V88C28 118.928 53.0721 144 84 144C114.928 144 140 118.928 140 88V28"
+      stroke="url(#umikoBlueWide)"
+      stroke-width="18"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <rect x="50" y="76" width="16" height="42" rx="8" fill="#FFD751" />
+    <rect x="80" y="56" width="16" height="62" rx="8" fill="#62D78B" />
+    <rect x="110" y="36" width="16" height="82" rx="8" fill="url(#umikoBlueWide)" />
+    <circle cx="88" cy="18" r="18" fill="#62D78B" />
+  </g>
+  <g fill="url(#umikoBlueWide)" font-family="Inter, Segoe UI, Arial, sans-serif" font-weight="700">
+    <text x="196" y="114" font-size="96" letter-spacing="4">U</text>
+    <text x="286" y="114" font-size="96" letter-spacing="4">M</text>
+    <text x="520" y="114" font-size="96" letter-spacing="4">K</text>
+    <text x="622" y="114" font-size="96" letter-spacing="4">O</text>
+  </g>
+  <text x="470" y="114" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="96" font-weight="700" fill="#62D78B">I</text>
+  <line x1="252" y1="150" x2="324" y2="150" stroke="url(#umikoBlueWide)" stroke-width="4" stroke-linecap="round" />
+  <text
+    x="348"
+    y="159"
+    fill="#334155"
+    font-family="Inter, Segoe UI, Arial, sans-serif"
+    font-size="24"
+    font-weight="500"
+    letter-spacing="3.5"
+  >
+    SMART CRM FOR EDUCATION
+  </text>
+  <line x1="706" y1="150" x2="748" y2="150" stroke="#62D78B" stroke-width="4" stroke-linecap="round" />
+</svg>

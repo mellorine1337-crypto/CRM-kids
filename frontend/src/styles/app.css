@@ -30,6 +30,18 @@ img {
   display: block;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 input,
 select,
 textarea {
@@ -240,8 +252,13 @@ textarea {
   width: 42px;
   height: 42px;
   border-radius: 14px;
-  color: #fff;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+  background: #ffffff;
+  border: 1px solid rgba(90, 178, 226, 0.22);
+}
+
+.brand-card__logo {
+  width: 28px;
+  height: 28px;
 }
 
 .brand-card__copy {
@@ -266,6 +283,11 @@ textarea {
   width: 56px;
   height: 56px;
   border-radius: 20px;
+}
+
+.brand-card--staff .brand-card__logo {
+  width: 34px;
+  height: 34px;
 }
 
 .brand-card strong,
@@ -2189,11 +2211,9 @@ textarea {
     linear-gradient(180deg, #ffffff, #ffffff);
 }
 
-.auth-showcase h1 {
-  margin: 0;
-  font-size: 44px;
-  line-height: 1.02;
-  letter-spacing: -0.04em;
+.auth-showcase__logo {
+  width: min(100%, 420px);
+  height: auto;
 }
 
 .auth-showcase__badge {

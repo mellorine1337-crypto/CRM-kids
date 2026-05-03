@@ -4,7 +4,6 @@ import {
   MenuSquare,
   Plus,
   Search,
-  ShieldCheck,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -52,7 +51,7 @@ export function DashboardLayout() {
       <aside className={isStaffShell ? "sidebar sidebar--staff" : "sidebar"}>
         <div className={isStaffShell ? "brand-card brand-card--staff" : "brand-card"}>
           <div className="brand-card__badge">
-            <ShieldCheck size={18} />
+            <img className="brand-card__logo" src="/favicon.svg" alt="umiko" />
           </div>
           <div className={isStaffShell ? "brand-card__copy brand-card__copy--hidden" : "brand-card__copy"}>
             <strong>{t("topbar.brandTitle")}</strong>
