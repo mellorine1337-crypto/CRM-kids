@@ -51,7 +51,7 @@ export function DashboardLayout() {
       <aside className={isStaffShell ? "sidebar sidebar--staff" : "sidebar"}>
         <div className={isStaffShell ? "brand-card brand-card--staff" : "brand-card"}>
           <div className="brand-card__badge">
-            <img className="brand-card__logo" src="/favicon.svg" alt="umiko" />
+            <img className="brand-card__logo" src="/umiko-mark.svg" alt="umiko" />
           </div>
           <div className={isStaffShell ? "brand-card__copy brand-card__copy--hidden" : "brand-card__copy"}>
             <strong>{t("topbar.brandTitle")}</strong>

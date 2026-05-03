@@ -202,7 +202,7 @@ export function LoginPage() {
     <div className="auth-shell">
       <section className="auth-showcase">
         <div className="auth-showcase__badge">
-          <ShieldCheck size={18} />
+          <img className="auth-showcase__badge-logo" src="/umiko-mark.svg" alt="" aria-hidden="true" />
           {t("login.badge")}
         </div>
         <img className="auth-showcase__logo" src="/umiko-logo.svg" alt="umiko" />

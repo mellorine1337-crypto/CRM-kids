@@ -1,4 +1,4 @@
-<svg width="760" height="180" viewBox="0 0 760 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="680" height="180" viewBox="0 0 680 180" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="umikoBlueWide" x1="20" y1="18" x2="560" y2="160" gradientUnits="userSpaceOnUse">
       <stop stop-color="#37ABF5" />
@@ -19,23 +19,23 @@
     <circle cx="88" cy="18" r="18" fill="#62D78B" />
   </g>
   <g fill="url(#umikoBlueWide)" font-family="Inter, Segoe UI, Arial, sans-serif" font-weight="700">
-    <text x="196" y="114" font-size="96" letter-spacing="4">U</text>
-    <text x="286" y="114" font-size="96" letter-spacing="4">M</text>
-    <text x="520" y="114" font-size="96" letter-spacing="4">K</text>
-    <text x="622" y="114" font-size="96" letter-spacing="4">O</text>
+    <text x="172" y="114" font-size="96" letter-spacing="2">U</text>
+    <text x="242" y="114" font-size="96" letter-spacing="2">M</text>
+    <text x="408" y="114" font-size="96" letter-spacing="2">K</text>
+    <text x="492" y="114" font-size="96" letter-spacing="2">O</text>
   </g>
-  <text x="470" y="114" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="96" font-weight="700" fill="#62D78B">I</text>
-  <line x1="252" y1="150" x2="324" y2="150" stroke="url(#umikoBlueWide)" stroke-width="4" stroke-linecap="round" />
+  <text x="357" y="114" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="96" font-weight="700" fill="#62D78B">I</text>
+  <line x1="214" y1="150" x2="278" y2="150" stroke="url(#umikoBlueWide)" stroke-width="4" stroke-linecap="round" />
   <text
-    x="348"
+    x="300"
     y="159"
     fill="#334155"
     font-family="Inter, Segoe UI, Arial, sans-serif"
-    font-size="24"
+    font-size="22"
     font-weight="500"
-    letter-spacing="3.5"
+    letter-spacing="2.8"
   >
     SMART CRM FOR EDUCATION
   </text>
-  <line x1="706" y1="150" x2="748" y2="150" stroke="#62D78B" stroke-width="4" stroke-linecap="round" />
+  <line x1="612" y1="150" x2="652" y2="150" stroke="#62D78B" stroke-width="4" stroke-linecap="round" />
 </svg>
