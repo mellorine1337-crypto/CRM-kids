@@ -116,8 +116,13 @@ textarea {
 
 .button--tab {
   flex: 1;
+  min-width: 0;
+  justify-content: center;
+  padding-inline: 12px;
   background: transparent;
   color: var(--color-text-soft);
+  white-space: nowrap;
+  text-align: center;
 }
 
 .button--tab-active {
@@ -2161,7 +2166,7 @@ textarea {
 
 .auth-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(420px, 480px);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 480px);
   width: min(100%, var(--content-max-width));
   margin: 0 auto;
   gap: 24px;
@@ -2172,6 +2177,7 @@ textarea {
 .auth-showcase,
 .auth-card {
   padding: 26px;
+  min-width: 0;
 }
 
 .auth-showcase {
@@ -2221,11 +2227,14 @@ textarea {
 }
 
 .auth-card__tabs {
-  display: flex;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
   padding: 8px;
   border-radius: 18px;
   background: var(--color-surface-soft);
+  overflow: hidden;
 }
 
 .screen-loader {
