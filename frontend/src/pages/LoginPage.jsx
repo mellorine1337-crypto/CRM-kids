@@ -205,7 +205,7 @@ export function LoginPage() {
           <ShieldCheck size={18} />
           {t("login.badge")}
         </div>
-        <h1>CRM для образовательного центра</h1>
+        <h1>umiko</h1>
         <p>Три роли, разные сценарии входа и единый рабочий контур для родителей, преподавателей и администратора.</p>
 
         <div className="showcase-grid">

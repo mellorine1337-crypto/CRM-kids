@@ -38,8 +38,8 @@ export const messages = {
     },
     topbar: {
       currentView: "Текущий раздел",
-      brandTitle: "CRM образовательного центра",
-      brandSubtitle: "Курсы, расписание и коммуникация в одной системе",
+      brandTitle: "umiko",
+      brandSubtitle: "CRM образовательного центра",
       searchPlaceholder: "Поиск",
       quickAdd: "Быстрое действие",
       notifications: "Уведомления",
@@ -50,7 +50,7 @@ export const messages = {
     },
     login: {
       authFailed: "Не удалось выполнить вход",
-      badge: "MVP CRM для образовательного центра",
+      badge: "umiko",
       headline: "Единая система для курсов, занятий, оплат и журнала посещаемости",
       description:
         "Управляйте учениками, расписанием, записями, оплатами и уведомлениями в одном аккуратном интерфейсе.",
@@ -871,8 +871,8 @@ export const messages = {
     },
     topbar: {
       currentView: "Ағымдағы бөлім",
-      brandTitle: "Білім беру орталығының CRM жүйесі",
-      brandSubtitle: "Курстар, кесте және коммуникация бір жүйеде",
+      brandTitle: "umiko",
+      brandSubtitle: "Білім беру орталығының CRM жүйесі",
       searchPlaceholder: "Іздеу",
       quickAdd: "Жылдам әрекет",
       notifications: "Хабарламалар",
