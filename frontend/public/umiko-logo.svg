@@ -19,15 +19,15 @@
     <circle cx="88" cy="18" r="18" fill="#62D78B" />
   </g>
   <g fill="url(#umikoBlueWide)" font-family="Inter, Segoe UI, Arial, sans-serif" font-weight="700">
-    <text x="172" y="114" font-size="96" letter-spacing="2">U</text>
-    <text x="242" y="114" font-size="96" letter-spacing="2">M</text>
-    <text x="408" y="114" font-size="96" letter-spacing="2">K</text>
-    <text x="492" y="114" font-size="96" letter-spacing="2">O</text>
+    <text x="156" y="114" font-size="96" letter-spacing="2">U</text>
+    <text x="226" y="114" font-size="96" letter-spacing="2">M</text>
+    <text x="392" y="114" font-size="96" letter-spacing="2">K</text>
+    <text x="476" y="114" font-size="96" letter-spacing="2">O</text>
   </g>
-  <text x="357" y="114" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="96" font-weight="700" fill="#62D78B">I</text>
-  <line x1="214" y1="150" x2="278" y2="150" stroke="url(#umikoBlueWide)" stroke-width="4" stroke-linecap="round" />
+  <text x="341" y="114" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="96" font-weight="700" fill="#62D78B">I</text>
+  <line x1="198" y1="150" x2="262" y2="150" stroke="url(#umikoBlueWide)" stroke-width="4" stroke-linecap="round" />
   <text
-    x="300"
+    x="284"
     y="159"
     fill="#334155"
     font-family="Inter, Segoe UI, Arial, sans-serif"
@@ -37,5 +37,5 @@
   >
     SMART CRM FOR EDUCATION
   </text>
-  <line x1="612" y1="150" x2="652" y2="150" stroke="#62D78B" stroke-width="4" stroke-linecap="round" />
+  <line x1="596" y1="150" x2="636" y2="150" stroke="#62D78B" stroke-width="4" stroke-linecap="round" />
 </svg>
