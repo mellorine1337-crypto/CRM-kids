@@ -57,8 +57,11 @@ export const resolveAssetUrl = (relativePath) => {
     return null;
   }
 
-  const apiUrl =
-    import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
+  const apiUrl = import.meta.env.VITE_API_BASE_URL?.trim() || "/api";
 
-  return `${new URL(apiUrl).origin}${relativePath}`;
+  if (/^https?:\/\//.test(apiUrl)) {
+    return `${new URL(apiUrl).origin}${relativePath}`;
+  }
+
+  return relativePath;
 };

@@ -12,42 +12,37 @@ const defaultAdminForm = {
   password: "",
 };
 
-const defaultParentForm = {
-  fullName: "",
+const defaultParentLoginForm = {
   phone: "",
-  code: "",
+  password: "",
+};
+
+const defaultParentRegisterForm = {
+  fullName: "",
+  email: "",
+  phone: "",
+  password: "",
 };
 
 const defaultTeacherForm = {
   phone: "",
-  code: "",
+  password: "",
 };
 
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const {
-    user,
-    loginAdmin,
-    requestParentCode,
-    verifyParentCode,
-    requestTeacherMagicLink,
-    verifyTeacherMagicLink,
-    requestTeacherCode,
-    verifyTeacherCode,
-  } = useAuth();
+  const { user, loginAdmin, registerParent, loginParent, loginTeacher } = useAuth();
   const { t } = useI18n();
   const { showToast } = useToast();
   const [roleMode, setRoleMode] = useState("parent");
-  const [teacherAuthMode, setTeacherAuthMode] = useState("magic");
+  const [parentMode, setParentMode] = useState("register");
   const [adminForm, setAdminForm] = useState(defaultAdminForm);
-  const [parentForm, setParentForm] = useState(defaultParentForm);
+  const [parentLoginForm, setParentLoginForm] = useState(defaultParentLoginForm);
+  const [parentRegisterForm, setParentRegisterForm] = useState(defaultParentRegisterForm);
   const [teacherForm, setTeacherForm] = useState(defaultTeacherForm);
-  const [parentStage, setParentStage] = useState("request");
-  const [teacherSmsStage, setTeacherSmsStage] = useState("request");
   const [submitting, setSubmitting] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [devHint, setDevHint] = useState(null);
+  const [visiblePasswordField, setVisiblePasswordField] = useState(null);
 
   useEffect(() => {
     if (sessionStorage.getItem(AUTH_EXPIRED_KEY) !== "1") {
@@ -62,44 +57,27 @@ export function LoginPage() {
     });
   }, [showToast, t]);
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const teacherMagicToken = params.get("teacherMagicToken");
-
-    if (!teacherMagicToken || user) {
-      return;
-    }
-
-    const verifyToken = async () => {
-      try {
-        await verifyTeacherMagicLink({ token: teacherMagicToken });
-        navigate(location.state?.from?.pathname || "/", { replace: true });
-      } catch (error) {
-        showToast({
-          title: t("login.authFailed"),
-          description: error.message,
-          tone: "error",
-        });
-      }
-    };
-
-    void verifyToken();
-  }, [location.search, location.state?.from?.pathname, navigate, showToast, t, user, verifyTeacherMagicLink]);
-
   if (user) {
     return <Navigate to="/" replace />;
   }
 
-  const resetHints = () => setDevHint(null);
+  const togglePasswordVisibility = (fieldName) => {
+    setVisiblePasswordField((current) => (current === fieldName ? null : fieldName));
+  };
 
   const handleAdminChange = (event) => {
     const { name, value } = event.target;
     setAdminForm((current) => ({ ...current, [name]: value }));
   };
 
-  const handleParentChange = (event) => {
+  const handleParentLoginChange = (event) => {
     const { name, value } = event.target;
-    setParentForm((current) => ({ ...current, [name]: value }));
+    setParentLoginForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleParentRegisterChange = (event) => {
+    const { name, value } = event.target;
+    setParentRegisterForm((current) => ({ ...current, [name]: value }));
   };
 
   const handleTeacherChange = (event) => {
@@ -110,7 +88,6 @@ export function LoginPage() {
   const handleAdminSubmit = async (event) => {
     event.preventDefault();
     setSubmitting(true);
-    resetHints();
 
     try {
       await loginAdmin(adminForm);
@@ -126,27 +103,31 @@ export function LoginPage() {
     }
   };
 
-  const handleParentSubmit = async (event) => {
+  const handleParentRegisterSubmit = async (event) => {
     event.preventDefault();
     setSubmitting(true);
-    resetHints();
 
     try {
-      if (parentStage === "request") {
-        const data = await requestParentCode({
-          fullName: parentForm.fullName,
-          phone: parentForm.phone,
-        });
-        setParentStage("verify");
-        setDevHint(
-          data.devCode
-            ? `Dev SMS-код для родителя: ${data.devCode}`
-            : "SMS-код отправлен.",
-        );
-      } else {
-        await verifyParentCode(parentForm);
-        navigate(location.state?.from?.pathname || "/");
-      }
+      await registerParent(parentRegisterForm);
+      navigate(location.state?.from?.pathname || "/");
+    } catch (error) {
+      showToast({
+        title: t("login.authFailed"),
+        description: error.message,
+        tone: "error",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleParentLoginSubmit = async (event) => {
+    event.preventDefault();
+    setSubmitting(true);
+
+    try {
+      await loginParent(parentLoginForm);
+      navigate(location.state?.from?.pathname || "/");
     } catch (error) {
       showToast({
         title: t("login.authFailed"),
@@ -161,32 +142,10 @@ export function LoginPage() {
   const handleTeacherSubmit = async (event) => {
     event.preventDefault();
     setSubmitting(true);
-    resetHints();
 
     try {
-      if (teacherAuthMode === "magic") {
-        const data = await requestTeacherMagicLink({
-          phone: teacherForm.phone,
-        });
-        setDevHint(
-          data.magicLink
-            ? `Dev magic link: ${data.magicLink}`
-            : "Ссылка для входа отправлена.",
-        );
-      } else if (teacherSmsStage === "request") {
-        const data = await requestTeacherCode({
-          phone: teacherForm.phone,
-        });
-        setTeacherSmsStage("verify");
-        setDevHint(
-          data.devCode
-            ? `Dev SMS-код для преподавателя: ${data.devCode}`
-            : "SMS-код отправлен.",
-        );
-      } else {
-        await verifyTeacherCode(teacherForm);
-        navigate(location.state?.from?.pathname || "/");
-      }
+      await loginTeacher(teacherForm);
+      navigate(location.state?.from?.pathname || "/");
     } catch (error) {
       showToast({
         title: t("login.authFailed"),
@@ -207,40 +166,41 @@ export function LoginPage() {
         </div>
         <img className="auth-showcase__logo" src="/umiko-logo.svg" alt="umiko" />
         <h1 className="sr-only">umiko</h1>
-        <p>Три роли, разные сценарии входа и единый рабочий контур для родителей, преподавателей и администратора.</p>
+        <p>{t("login.accessDescription")}</p>
 
         <div className="showcase-grid">
           <article className="showcase-card">
             <Sparkles size={18} />
-            <strong>Родитель</strong>
-            <span>Вход по номеру телефона и SMS-коду.</span>
+            <strong>{t("login.roleParent")}</strong>
+            <span>{t("login.parentCardDescription")}</span>
           </article>
           <article className="showcase-card">
             <Star size={18} />
-            <strong>Преподаватель</strong>
-            <span>Вход по magic link или SMS-коду.</span>
+            <strong>{t("roles.TEACHER")}</strong>
+            <span>{t("login.teacherCardDescription")}</span>
           </article>
           <article className="showcase-card">
             <ShieldCheck size={18} />
-            <strong>Администратор</strong>
-            <span>Вход по email и паролю.</span>
+            <strong>{t("roles.ADMIN")}</strong>
+            <span>{t("login.adminCardDescription")}</span>
           </article>
         </div>
 
         <div className="demo-box">
-          <strong>Тестовые аккаунты</strong>
+          <strong>{t("login.demoAccounts")}</strong>
           <span>`admin@kidscrm.local / Admin123!`</span>
-          <span>`+77001000011` и `+77001000012` для преподавателей</span>
-          <span>`+77001000002` и `+77001000003` для родителей</span>
+          <span>`+77001000011 / Teacher123!`</span>
+          <span>`+77001000012 / Teacher123!`</span>
+          <span>`+77001000002 / Parent123!`</span>
         </div>
       </section>
 
       <section className="auth-card">
         <div className="auth-card__tabs">
           {[
-            { key: "parent", label: "Родитель" },
-            { key: "teacher", label: "Преподаватель" },
-            { key: "admin", label: "Администратор" },
+            { key: "parent", label: t("login.roleParent") },
+            { key: "teacher", label: t("roles.TEACHER") },
+            { key: "admin", label: t("roles.ADMIN") },
           ].map((item) => (
             <button
               key={item.key}
@@ -250,10 +210,7 @@ export function LoginPage() {
                   ? "button button--tab button--tab-active"
                   : "button button--tab"
               }
-              onClick={() => {
-                setRoleMode(item.key);
-                resetHints();
-              }}
+              onClick={() => setRoleMode(item.key)}
             >
               {item.label}
             </button>
@@ -278,7 +235,7 @@ export function LoginPage() {
               <span>{t("login.password")}</span>
               <div className="password-field">
                 <input
-                  type={showPassword ? "text" : "password"}
+                  type={visiblePasswordField === "admin" ? "text" : "password"}
                   name="password"
                   value={adminForm.password}
                   onChange={handleAdminChange}
@@ -288,137 +245,204 @@ export function LoginPage() {
                 <button
                   type="button"
                   className="password-field__toggle"
-                  onClick={() => setShowPassword((current) => !current)}
+                  onClick={() => togglePasswordVisibility("admin")}
                   aria-label={
-                    showPassword ? t("common.hidePassword") : t("common.showPassword")
+                    visiblePasswordField === "admin"
+                      ? t("common.hidePassword")
+                      : t("common.showPassword")
                   }
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {visiblePasswordField === "admin" ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </label>
 
             <button type="submit" className="button button--primary button--full" disabled={submitting}>
-              {submitting ? t("login.pleaseWait") : "Войти как администратор"}
+              {submitting ? t("login.pleaseWait") : t("login.adminLoginAction")}
             </button>
           </form>
         ) : null}
 
         {roleMode === "parent" ? (
-          <form className="stack-lg" onSubmit={handleParentSubmit}>
-            <label className="field">
-              <span>{t("login.fullName")}</span>
-              <input
-                name="fullName"
-                value={parentForm.fullName}
-                onChange={handleParentChange}
-                placeholder={t("login.fullNamePlaceholder")}
-                required={parentStage === "request"}
-              />
-            </label>
-            <label className="field">
-              <span>{t("login.phone")}</span>
-              <input
-                type="tel"
-                name="phone"
-                value={parentForm.phone}
-                onChange={handleParentChange}
-                placeholder={t("login.phonePlaceholder")}
-                required
-              />
-            </label>
-            {parentStage === "verify" ? (
-              <label className="field">
-                <span>SMS-код</span>
-                <input
-                  name="code"
-                  value={parentForm.code}
-                  onChange={handleParentChange}
-                  placeholder="6 цифр"
-                  required
-                />
-              </label>
-            ) : null}
-            {devHint ? <p className="helper-text">{devHint}</p> : null}
-            <button type="submit" className="button button--primary button--full" disabled={submitting}>
-              {submitting
-                ? t("login.pleaseWait")
-                : parentStage === "request"
-                  ? "Получить SMS-код"
-                  : "Подтвердить код"}
-            </button>
-          </form>
-        ) : null}
-
-        {roleMode === "teacher" ? (
           <div className="stack-lg">
             <div className="auth-card__tabs">
               <button
                 type="button"
                 className={
-                  teacherAuthMode === "magic"
+                  parentMode === "register"
                     ? "button button--tab button--tab-active"
                     : "button button--tab"
                 }
-                onClick={() => {
-                  setTeacherAuthMode("magic");
-                  resetHints();
-                }}
+                onClick={() => setParentMode("register")}
               >
-                Magic link
+                {t("login.parentRegisterMode")}
               </button>
               <button
                 type="button"
                 className={
-                  teacherAuthMode === "sms"
+                  parentMode === "login"
                     ? "button button--tab button--tab-active"
                     : "button button--tab"
                 }
-                onClick={() => {
-                  setTeacherAuthMode("sms");
-                  resetHints();
-                }}
+                onClick={() => setParentMode("login")}
               >
-                SMS
+                {t("login.parentLoginMode")}
               </button>
             </div>
 
-            <form className="stack-lg" onSubmit={handleTeacherSubmit}>
-              <label className="field">
-                <span>{t("login.phone")}</span>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={teacherForm.phone}
-                  onChange={handleTeacherChange}
-                  placeholder={t("login.phonePlaceholder")}
-                  required
-                />
-              </label>
-              {teacherAuthMode === "sms" && teacherSmsStage === "verify" ? (
+            {parentMode === "register" ? (
+              <form className="stack-lg" onSubmit={handleParentRegisterSubmit}>
                 <label className="field">
-                  <span>SMS-код</span>
+                  <span>{t("login.fullName")}</span>
                   <input
-                    name="code"
-                    value={teacherForm.code}
-                    onChange={handleTeacherChange}
-                    placeholder="6 цифр"
+                    name="fullName"
+                    value={parentRegisterForm.fullName}
+                    onChange={handleParentRegisterChange}
+                    placeholder={t("login.fullNamePlaceholder")}
                     required
                   />
                 </label>
-              ) : null}
-              {devHint ? <p className="helper-text">{devHint}</p> : null}
-              <button type="submit" className="button button--primary button--full" disabled={submitting}>
-                {submitting
-                  ? t("login.pleaseWait")
-                  : teacherAuthMode === "magic"
-                    ? "Получить ссылку"
-                    : teacherSmsStage === "request"
-                      ? "Получить SMS-код"
-                      : "Подтвердить код"}
-              </button>
-            </form>
+                <label className="field">
+                  <span>{t("login.email")}</span>
+                  <input
+                    type="email"
+                    name="email"
+                    value={parentRegisterForm.email}
+                    onChange={handleParentRegisterChange}
+                    placeholder={t("login.emailPlaceholder")}
+                    required
+                  />
+                </label>
+                <label className="field">
+                  <span>{t("login.phone")}</span>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={parentRegisterForm.phone}
+                    onChange={handleParentRegisterChange}
+                    placeholder={t("login.phonePlaceholder")}
+                    required
+                  />
+                </label>
+                <label className="field">
+                  <span>{t("login.password")}</span>
+                  <div className="password-field">
+                    <input
+                      type={visiblePasswordField === "parent-register" ? "text" : "password"}
+                      name="password"
+                      value={parentRegisterForm.password}
+                      onChange={handleParentRegisterChange}
+                      placeholder={t("login.passwordPlaceholder")}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="password-field__toggle"
+                      onClick={() => togglePasswordVisibility("parent-register")}
+                      aria-label={
+                        visiblePasswordField === "parent-register"
+                          ? t("common.hidePassword")
+                          : t("common.showPassword")
+                      }
+                    >
+                      {visiblePasswordField === "parent-register" ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  <p className="helper-text">{t("login.registerHint")}</p>
+                </label>
+                <button type="submit" className="button button--primary button--full" disabled={submitting}>
+                  {submitting ? t("login.pleaseWait") : t("login.parentRegisterAction")}
+                </button>
+              </form>
+            ) : (
+              <form className="stack-lg" onSubmit={handleParentLoginSubmit}>
+                <label className="field">
+                  <span>{t("login.phone")}</span>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={parentLoginForm.phone}
+                    onChange={handleParentLoginChange}
+                    placeholder={t("login.phonePlaceholder")}
+                    required
+                  />
+                </label>
+                <label className="field">
+                  <span>{t("login.password")}</span>
+                  <div className="password-field">
+                    <input
+                      type={visiblePasswordField === "parent-login" ? "text" : "password"}
+                      name="password"
+                      value={parentLoginForm.password}
+                      onChange={handleParentLoginChange}
+                      placeholder={t("login.passwordPlaceholder")}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="password-field__toggle"
+                      onClick={() => togglePasswordVisibility("parent-login")}
+                      aria-label={
+                        visiblePasswordField === "parent-login"
+                          ? t("common.hidePassword")
+                          : t("common.showPassword")
+                      }
+                    >
+                      {visiblePasswordField === "parent-login" ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </label>
+                <button type="submit" className="button button--primary button--full" disabled={submitting}>
+                  {submitting ? t("login.pleaseWait") : t("login.parentLoginAction")}
+                </button>
+              </form>
+            )}
           </div>
+        ) : null}
+
+        {roleMode === "teacher" ? (
+          <form className="stack-lg" onSubmit={handleTeacherSubmit}>
+            <label className="field">
+              <span>{t("login.phone")}</span>
+              <input
+                type="tel"
+                name="phone"
+                value={teacherForm.phone}
+                onChange={handleTeacherChange}
+                placeholder={t("login.phonePlaceholder")}
+                required
+              />
+            </label>
+            <label className="field">
+              <span>{t("login.password")}</span>
+              <div className="password-field">
+                <input
+                  type={visiblePasswordField === "teacher" ? "text" : "password"}
+                  name="password"
+                  value={teacherForm.password}
+                  onChange={handleTeacherChange}
+                  placeholder={t("login.passwordPlaceholder")}
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-field__toggle"
+                  onClick={() => togglePasswordVisibility("teacher")}
+                  aria-label={
+                    visiblePasswordField === "teacher"
+                      ? t("common.hidePassword")
+                      : t("common.showPassword")
+                  }
+                >
+                  {visiblePasswordField === "teacher" ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              <p className="helper-text">{t("login.teacherAccessNote")}</p>
+            </label>
+            <button type="submit" className="button button--primary button--full" disabled={submitting}>
+              {submitting ? t("login.pleaseWait") : t("login.teacherLoginAction")}
+            </button>
+          </form>
         ) : null}
       </section>
     </div>

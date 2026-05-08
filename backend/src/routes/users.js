@@ -10,6 +10,7 @@ const {
   fullNameSchema,
   optionalPhoneSchema,
   passwordSchema,
+  phoneSchema,
 } = require("../utils/validation");
 const { requireRoles } = require("../middleware/auth");
 
@@ -26,7 +27,37 @@ const updateProfileSchema = z
     message: "At least one field must be provided",
   });
 
+const createTeacherSchema = z.object({
+  fullName: fullNameSchema,
+  email: emailSchema,
+  phone: phoneSchema,
+  password: passwordSchema,
+});
+
 router.use(requireAuth);
+
+const ensureUniqueUserFields = async ({ email, phone, excludeUserId }) => {
+  const [existingEmailUser, existingPhoneUser] = await Promise.all([
+    email
+      ? prisma.user.findUnique({
+          where: { email: email.toLowerCase() },
+        })
+      : null,
+    phone
+      ? prisma.user.findFirst({
+          where: { phone },
+        })
+      : null,
+  ]);
+
+  if (existingEmailUser && existingEmailUser.id !== excludeUserId) {
+    throw { status: 409, message: "Email is already in use" };
+  }
+
+  if (existingPhoneUser && existingPhoneUser.id !== excludeUserId) {
+    throw { status: 409, message: "Phone is already in use" };
+  }
+};
 
 router.get(
   "/me",
@@ -71,20 +102,43 @@ router.get(
   }),
 );
 
+router.post(
+  "/teachers",
+  requireRoles("ADMIN"),
+  asyncHandler(async (req, res) => {
+    const data = createTeacherSchema.parse(req.body);
+
+    await ensureUniqueUserFields({
+      email: data.email,
+      phone: data.phone,
+    });
+
+    const teacher = await prisma.user.create({
+      data: {
+        fullName: data.fullName,
+        email: data.email.toLowerCase(),
+        phone: data.phone,
+        passwordHash: await bcrypt.hash(data.password, 10),
+        role: "TEACHER",
+      },
+    });
+
+    res.status(201).json({
+      user: serializeUser(teacher),
+    });
+  }),
+);
+
 router.patch(
   "/me",
   asyncHandler(async (req, res) => {
     const data = updateProfileSchema.parse(req.body);
 
-    if (data.email && data.email.toLowerCase() !== req.user.email) {
-      const existingUser = await prisma.user.findUnique({
-        where: { email: data.email.toLowerCase() },
-      });
-
-      if (existingUser) {
-        throw { status: 409, message: "Email is already in use" };
-      }
-    }
+    await ensureUniqueUserFields({
+      email: data.email,
+      phone: data.phone,
+      excludeUserId: req.user.id,
+    });
 
     const updatedUser = await prisma.user.update({
       where: { id: req.user.id },

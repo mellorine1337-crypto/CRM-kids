@@ -44,38 +44,20 @@ export function AuthProvider({ children }) {
         setUser(data.user);
         return data.user;
       },
-      async login(payload) {
-        const { data } = await api.post("/auth/login", payload);
-        setTokens(data.tokens);
-        setUser(data.user);
-        return data.user;
-      },
-      async requestParentCode(payload) {
-        const { data } = await api.post("/auth/parent/code/request", payload);
-        return data;
-      },
-      async verifyParentCode(payload) {
-        const { data } = await api.post("/auth/parent/code/verify", payload);
+      async registerParent(payload) {
+        const { data } = await api.post("/auth/parent/register", payload);
         setTokens(data.tokens);
         setUser(data.user);
         return data;
       },
-      async requestTeacherMagicLink(payload) {
-        const { data } = await api.post("/auth/teacher/magic-link/request", payload);
-        return data;
-      },
-      async verifyTeacherMagicLink(payload) {
-        const { data } = await api.post("/auth/teacher/magic-link/verify", payload);
+      async loginParent(payload) {
+        const { data } = await api.post("/auth/parent/login", payload);
         setTokens(data.tokens);
         setUser(data.user);
         return data;
       },
-      async requestTeacherCode(payload) {
-        const { data } = await api.post("/auth/teacher/code/request", payload);
-        return data;
-      },
-      async verifyTeacherCode(payload) {
-        const { data } = await api.post("/auth/teacher/code/verify", payload);
+      async loginTeacher(payload) {
+        const { data } = await api.post("/auth/teacher/login", payload);
         setTokens(data.tokens);
         setUser(data.user);
         return data;

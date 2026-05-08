@@ -13,6 +13,7 @@ const { errorHandler, notFoundHandler } = require("./middleware/error-handler");
 const app = express();
 const openApiDocument = YAML.load(path.join(__dirname, "../docs/openapi.yaml"));
 const isDevelopment = env.nodeEnv !== "production";
+const frontendDistDir = path.resolve(__dirname, "../../frontend/dist");
 const allowedOrigins = new Set([env.frontendUrl]);
 // В dev-режиме разрешаем локальные адреса сети, потому что Vite часто запускается на другом порту или по LAN IP.
 const devOriginPatterns = [
@@ -55,6 +56,14 @@ app.use("/uploads", express.static(env.uploadDir));
 // Swagger подключён к тому же Express-приложению, чтобы спецификация API и реальная реализация не расходились.
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openApiDocument));
 app.use("/api", routes);
+
+if (!isDevelopment) {
+  app.use(express.static(frontendDistDir));
+  app.get(/^\/(?!api(?:\/|$)).*/, (_req, res) => {
+    res.sendFile(path.join(frontendDistDir, "index.html"));
+  });
+}
+
 app.use(notFoundHandler);
 app.use(errorHandler);
 
