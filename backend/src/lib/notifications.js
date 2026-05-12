@@ -1,3 +1,4 @@
+// Кратко: создаёт и сохраняет системные уведомления для пользователей.
 const { prisma } = require("./prisma");
 const { sendMail } = require("./mailer");
 

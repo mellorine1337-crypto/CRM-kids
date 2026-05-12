@@ -1,3 +1,4 @@
+// Кратко: рекомендации по детям и учебному процессу для административной роли.
 import {
   AlertTriangle,
   ShieldCheck,
@@ -27,6 +28,7 @@ const emptyData = {
   generatedAt: null,
 };
 
+// React-компонент RecommendationsPage: собирает экран и связывает его с состоянием и API.
 export function RecommendationsPage() {
   const { user } = useAuth();
   const { t } = useI18n();
@@ -34,6 +36,7 @@ export function RecommendationsPage() {
   const [data, setData] = useState(emptyData);
 
   useEffect(() => {
+    // Функция loadRecommendations: загружает данные и обновляет состояние.
     const loadRecommendations = async () => {
       try {
         const { data: response } = await api.get("/recommendations");

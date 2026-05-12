@@ -1,3 +1,4 @@
+// Кратко: список пользовательских уведомлений с приоритетами и фильтрами.
 import { BellRing } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client.js";
@@ -8,12 +9,14 @@ import { useToast } from "../hooks/useToast.js";
 import { formatDateTime } from "../utils/format.js";
 import { resolveNotificationPriority } from "../utils/notifications.js";
 
+// React-компонент NotificationsPage: собирает экран и связывает его с состоянием и API.
 export function NotificationsPage() {
   const { locale, t } = useI18n();
   const { showToast } = useToast();
   const [notifications, setNotifications] = useState([]);
   const [filter, setFilter] = useState("all");
 
+  // Функция loadNotifications: загружает данные и обновляет состояние.
   const loadNotifications = async () => {
     try {
       const { data } = await api.get("/notifications");
@@ -28,6 +31,7 @@ export function NotificationsPage() {
   };
 
   useEffect(() => {
+    // Служебная функция bootstrap: инкапсулирует отдельный шаг логики этого модуля.
     const bootstrap = async () => {
       try {
         const { data } = await api.get("/notifications");
@@ -61,6 +65,7 @@ export function NotificationsPage() {
     [enrichedNotifications, filter],
   );
 
+  // Функция handleRead: обрабатывает пользовательское действие или событие.
   const handleRead = async (notification) => {
     try {
       await api.patch(`/notifications/${notification.id}/read`);

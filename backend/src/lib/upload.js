@@ -1,8 +1,10 @@
+// Кратко: настраивает загрузку файлов и правила сохранения детских аватаров.
 const fs = require("node:fs");
 const path = require("node:path");
 const multer = require("multer");
 const { env } = require("../config/env");
 
+// Служебная функция ensureDir: инкапсулирует отдельный шаг логики этого модуля.
 const ensureDir = (targetPath) => {
   fs.mkdirSync(targetPath, { recursive: true });
 };

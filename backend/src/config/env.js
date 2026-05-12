@@ -1,3 +1,4 @@
+// Кратко: централизует чтение переменных окружения и даёт проекту единый объект конфигурации.
 const path = require("node:path");
 const dotenv = require("dotenv");
 

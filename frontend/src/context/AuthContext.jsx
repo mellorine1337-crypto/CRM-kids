@@ -1,3 +1,4 @@
+// Кратко: хранит состояние авторизации и методы входа, регистрации, logout и обновления профиля.
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client.js";
 import { AuthContext } from "./auth-context.js";
@@ -8,11 +9,14 @@ import {
   setTokens,
 } from "../utils/token-storage.js";
 
+// Провайдер AuthProvider: передаёт общее состояние и методы через context.
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
+    // При старте приложения пробуем восстановить пользователя по уже сохранённым токенам.
+    // Это позволяет не выбрасывать человека на login после перезагрузки страницы.
     const bootstrap = async () => {
       if (!getAccessToken() && !getRefreshToken()) {
         setInitialized(true);
@@ -38,6 +42,8 @@ export function AuthProvider({ children }) {
       user,
       initialized,
       isAuthenticated: Boolean(user),
+      // Методы ниже скрывают детали API от экранов: страница входа вызывает только login/register,
+      // а обновление токенов и сохранение пользователя остаётся внутри auth-слоя.
       async loginAdmin(payload) {
         const { data } = await api.post("/auth/admin/login", payload);
         setTokens(data.tokens);

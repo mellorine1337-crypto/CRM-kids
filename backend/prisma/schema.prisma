@@ -1,3 +1,4 @@
+// Кратко: основная Prisma-схема со всеми таблицами, enum-типами и связями проекта.
 generator client {
   provider = "prisma-client-js"
 }

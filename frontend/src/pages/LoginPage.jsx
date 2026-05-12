@@ -1,3 +1,4 @@
+// Кратко: единая точка входа, где родитель регистрируется, а админ и преподаватель входят в систему.
 import { Eye, EyeOff, ShieldCheck, Sparkles, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
@@ -29,6 +30,7 @@ const defaultTeacherForm = {
   password: "",
 };
 
+// React-компонент LoginPage: собирает экран и связывает его с состоянием и API.
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -45,6 +47,8 @@ export function LoginPage() {
   const [visiblePasswordField, setVisiblePasswordField] = useState(null);
 
   useEffect(() => {
+    // Если interceptor выбросил пользователя из-за просроченной сессии,
+    // показываем причину прямо на login, а не оставляем молчаливый logout.
     if (sessionStorage.getItem(AUTH_EXPIRED_KEY) !== "1") {
       return;
     }
@@ -61,30 +65,36 @@ export function LoginPage() {
     return <Navigate to="/" replace />;
   }
 
+  // Функция togglePasswordVisibility: переключает локальное состояние интерфейса.
   const togglePasswordVisibility = (fieldName) => {
     setVisiblePasswordField((current) => (current === fieldName ? null : fieldName));
   };
 
+  // Для каждой роли держим отдельный state, чтобы формы не перетирали друг друга при переключении вкладок.
   const handleAdminChange = (event) => {
     const { name, value } = event.target;
     setAdminForm((current) => ({ ...current, [name]: value }));
   };
 
+  // Функция handleParentLoginChange: обрабатывает пользовательское действие или событие.
   const handleParentLoginChange = (event) => {
     const { name, value } = event.target;
     setParentLoginForm((current) => ({ ...current, [name]: value }));
   };
 
+  // Функция handleParentRegisterChange: обрабатывает пользовательское действие или событие.
   const handleParentRegisterChange = (event) => {
     const { name, value } = event.target;
     setParentRegisterForm((current) => ({ ...current, [name]: value }));
   };
 
+  // Функция handleTeacherChange: обрабатывает пользовательское действие или событие.
   const handleTeacherChange = (event) => {
     const { name, value } = event.target;
     setTeacherForm((current) => ({ ...current, [name]: value }));
   };
 
+  // submit-обработчики разделены по ролям, потому что backend использует разные endpoints и разную валидацию.
   const handleAdminSubmit = async (event) => {
     event.preventDefault();
     setSubmitting(true);
@@ -103,6 +113,7 @@ export function LoginPage() {
     }
   };
 
+  // Функция handleParentRegisterSubmit: обрабатывает пользовательское действие или событие.
   const handleParentRegisterSubmit = async (event) => {
     event.preventDefault();
     setSubmitting(true);
@@ -121,6 +132,7 @@ export function LoginPage() {
     }
   };
 
+  // Функция handleParentLoginSubmit: обрабатывает пользовательское действие или событие.
   const handleParentLoginSubmit = async (event) => {
     event.preventDefault();
     setSubmitting(true);
@@ -139,6 +151,7 @@ export function LoginPage() {
     }
   };
 
+  // Функция handleTeacherSubmit: обрабатывает пользовательское действие или событие.
   const handleTeacherSubmit = async (event) => {
     event.preventDefault();
     setSubmitting(true);
@@ -196,6 +209,7 @@ export function LoginPage() {
       </section>
 
       <section className="auth-card">
+        {/* Верхние табы переключают именно сценарий входа, а не просто внешний вид формы. */}
         <div className="auth-card__tabs">
           {[
             { key: "parent", label: t("login.roleParent") },
@@ -218,6 +232,7 @@ export function LoginPage() {
         </div>
 
         {roleMode === "admin" ? (
+          // Администратор входит по email и паролю, потому что это самый строгий сценарий доступа.
           <form className="stack-lg" onSubmit={handleAdminSubmit}>
             <label className="field">
               <span>{t("login.email")}</span>
@@ -264,6 +279,7 @@ export function LoginPage() {
         ) : null}
 
         {roleMode === "parent" ? (
+          // Родительский сценарий объединяет регистрацию и вход в одном блоке, чтобы не плодить отдельные страницы.
           <div className="stack-lg">
             <div className="auth-card__tabs">
               <button
@@ -401,6 +417,7 @@ export function LoginPage() {
         ) : null}
 
         {roleMode === "teacher" ? (
+          // У преподавателя нет публичной регистрации: он входит только по данным, которые создал администратор.
           <form className="stack-lg" onSubmit={handleTeacherSubmit}>
             <label className="field">
               <span>{t("login.phone")}</span>

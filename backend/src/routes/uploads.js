@@ -1,3 +1,4 @@
+// Кратко: приём и сохранение файлов, связанных с детьми.
 const express = require("express");
 const { prisma } = require("../lib/prisma");
 const { upload } = require("../lib/upload");
@@ -7,8 +8,10 @@ const { serializeChild } = require("../utils/serializers");
 
 const router = express.Router();
 
+// REST-маршрут USE /children/:childId/avatar: обрабатывает запросы этого модуля.
 router.use(requireAuth);
 
+// REST-маршрут POST /children/:childId/avatar: обрабатывает запросы этого модуля.
 router.post(
   "/children/:childId/avatar",
   upload.single("file"),

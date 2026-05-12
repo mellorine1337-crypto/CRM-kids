@@ -1,3 +1,4 @@
+// Кратко: компактная карточка метрики для dashboard и аналитики.
 export function StatCard(props) {
   const { icon: Icon, label, value, tone = "blue" } = props;
 

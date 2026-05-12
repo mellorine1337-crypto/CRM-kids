@@ -1,3 +1,4 @@
+// Кратко: реализует двустороннюю обратную связь между родителем и преподавателем.
 const express = require("express");
 const { z } = require("zod");
 const { prisma } = require("../lib/prisma");
@@ -62,10 +63,12 @@ const detailInclude = {
   },
 };
 
+// Функция getScope: возвращает значение или подготовленные данные по входным параметрам.
 const getScope = (user) => ({
   ...(user.role === "PARENT" ? { parentId: user.id } : { staffId: user.id }),
 });
 
+// Служебная функция toSummary: инкапсулирует отдельный шаг логики этого модуля.
 const toSummary = (thread) =>
   serializeFeedbackThread({
     ...thread,
@@ -73,6 +76,7 @@ const toSummary = (thread) =>
     messages: undefined,
   });
 
+// Функция loadThread: загружает данные и обновляет состояние.
 const loadThread = async (threadId, user, include) => {
   const thread = await prisma.feedbackThread.findFirst({
     where: {
@@ -89,9 +93,12 @@ const loadThread = async (threadId, user, include) => {
   return thread;
 };
 
+// REST-маршрут USE PARENT: обрабатывает запросы этого модуля.
 router.use(requireAuth);
+// REST-маршрут USE /options: обрабатывает запросы этого модуля.
 router.use(requireRoles("PARENT", "TEACHER"));
 
+// REST-маршрут GET /options: обрабатывает запросы этого модуля.
 router.get(
   "/options",
   asyncHandler(async (req, res) => {
@@ -134,6 +141,7 @@ router.get(
   }),
 );
 
+// REST-маршрут GET /: обрабатывает запросы этого модуля.
 router.get(
   "/",
   asyncHandler(async (req, res) => {
@@ -149,6 +157,7 @@ router.get(
   }),
 );
 
+// REST-маршрут GET /:id: обрабатывает запросы этого модуля.
 router.get(
   "/:id",
   asyncHandler(async (req, res) => {
@@ -173,6 +182,7 @@ router.get(
   }),
 );
 
+// REST-маршрут POST /: обрабатывает запросы этого модуля.
 router.post(
   "/",
   asyncHandler(async (req, res) => {
@@ -253,6 +263,7 @@ router.post(
   }),
 );
 
+// REST-маршрут POST /:id/messages: обрабатывает запросы этого модуля.
 router.post(
   "/:id/messages",
   asyncHandler(async (req, res) => {

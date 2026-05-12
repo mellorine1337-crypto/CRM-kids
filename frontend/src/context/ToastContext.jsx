@@ -1,3 +1,4 @@
+// Кратко: управляет всплывающими уведомлениями frontend-части.
 import { useCallback, useMemo, useState } from "react";
 import { CheckCircle2, CircleAlert, Info, X } from "lucide-react";
 import { ToastContext } from "./toast-context.js";
@@ -8,6 +9,7 @@ const toneIcons = {
   info: Info,
 };
 
+// Провайдер ToastProvider: передаёт общее состояние и методы через context.
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 

@@ -1,3 +1,4 @@
+// Кратко: экран оплат, долгов и финансовой истории.
 import { CheckCircle2, CreditCard, Download, Plus } from "lucide-react";
 import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
@@ -25,6 +26,7 @@ const emptyManualForm = {
   comment: "",
 };
 
+// React-компонент PaymentsPage: собирает экран и связывает его с состоянием и API.
 export function PaymentsPage() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
@@ -72,6 +74,7 @@ export function PaymentsPage() {
       return;
     }
 
+    // Служебная функция bootstrap: инкапсулирует отдельный шаг логики этого модуля.
     const bootstrap = async () => {
       await loadData();
     };
@@ -186,6 +189,7 @@ export function PaymentsPage() {
     return <Navigate to="/" replace />;
   }
 
+  // Функция handleCreatePayment: обрабатывает пользовательское действие или событие.
   const handleCreatePayment = async (enrollmentId) => {
     try {
       const { data } = await api.post("/payments/create-intent", {
@@ -218,6 +222,7 @@ export function PaymentsPage() {
     }
   };
 
+  // Функция handleConfirmPayment: обрабатывает пользовательское действие или событие.
   const handleConfirmPayment = async (paymentId) => {
     try {
       await api.post(`/payments/${paymentId}/confirm`);
@@ -237,6 +242,7 @@ export function PaymentsPage() {
     }
   };
 
+  // Функция handlePayAll: обрабатывает пользовательское действие или событие.
   const handlePayAll = async () => {
     if (!unpaidEnrollments.length) {
       return;
@@ -284,11 +290,13 @@ export function PaymentsPage() {
     }
   };
 
+  // Функция handleManualChange: обрабатывает пользовательское действие или событие.
   const handleManualChange = (event) => {
     const { name, value } = event.target;
     setManualForm((current) => ({ ...current, [name]: value }));
   };
 
+  // Функция handleManualSubmit: обрабатывает пользовательское действие или событие.
   const handleManualSubmit = async (event) => {
     event.preventDefault();
 
@@ -322,6 +330,7 @@ export function PaymentsPage() {
     }
   };
 
+  // Функция handleExport: обрабатывает пользовательское действие или событие.
   const handleExport = async () => {
     try {
       const params = reportFrom || reportTo

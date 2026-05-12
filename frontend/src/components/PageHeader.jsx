@@ -1,3 +1,4 @@
+// Кратко: единый заголовок страницы с названием и кратким контекстом экрана.
 export function PageHeader({ title, description, action }) {
   return (
     <header className="page-header">

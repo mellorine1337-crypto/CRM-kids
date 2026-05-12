@@ -1,9 +1,11 @@
+// Кратко: создаёт первого администратора в production, если его ещё нет в базе.
 const bcrypt = require("bcryptjs");
 const { PrismaClient } = require("@prisma/client");
 const { env } = require("../src/config/env");
 
 const prisma = new PrismaClient();
 
+// Функция getBootstrapAdminConfig: возвращает значение или подготовленные данные по входным параметрам.
 const getBootstrapAdminConfig = () => ({
   fullName: process.env.BOOTSTRAP_ADMIN_FULL_NAME || "",
   email: process.env.BOOTSTRAP_ADMIN_EMAIL || "",
@@ -11,6 +13,7 @@ const getBootstrapAdminConfig = () => ({
   password: process.env.BOOTSTRAP_ADMIN_PASSWORD || "",
 });
 
+// Служебная функция assertBootstrapConfig: инкапсулирует отдельный шаг логики этого модуля.
 const assertBootstrapConfig = (config) => {
   const requiredKeys = ["fullName", "email", "password"];
   return requiredKeys.filter((key) => !config[key]);

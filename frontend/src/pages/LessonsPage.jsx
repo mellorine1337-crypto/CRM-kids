@@ -1,3 +1,4 @@
+// Кратко: календарь и управление расписанием занятий для всех ролей.
 import {
   CalendarDays,
   ChevronLeft,
@@ -40,14 +41,17 @@ const emptyLesson = {
   price: 5000,
 };
 
+// Служебная функция addDays: инкапсулирует отдельный шаг логики этого модуля.
 const addDays = (date, days) => {
   const value = new Date(date);
   value.setDate(value.getDate() + days);
   return value;
 };
 
+// Служебная функция startOfMonth: инкапсулирует отдельный шаг логики этого модуля.
 const startOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
 
+// Служебная функция startOfWeek: инкапсулирует отдельный шаг логики этого модуля.
 const startOfWeek = (date) => {
   const value = new Date(date);
   const day = value.getDay();
@@ -57,11 +61,13 @@ const startOfWeek = (date) => {
   return value;
 };
 
+// Функция isSameDay: проверяет условие и возвращает логический результат.
 const isSameDay = (left, right) =>
   left.getFullYear() === right.getFullYear() &&
   left.getMonth() === right.getMonth() &&
   left.getDate() === right.getDate();
 
+// Функция getDateKey: возвращает значение или подготовленные данные по входным параметрам.
 const getDateKey = (value) => {
   const date = new Date(value);
   const year = date.getFullYear();
@@ -70,6 +76,7 @@ const getDateKey = (value) => {
   return `${year}-${month}-${day}`;
 };
 
+// Функция getLessonAccent: возвращает значение или подготовленные данные по входным параметрам.
 const getLessonAccent = (lesson) => {
   const source = `${lesson.teacherName}-${lesson.title}`;
   const hash = Array.from(source).reduce((sum, char) => sum + char.charCodeAt(0), 0);
@@ -79,6 +86,7 @@ const getLessonAccent = (lesson) => {
   };
 };
 
+// Функция createParentPreviewLesson: создаёт объект, запись или производную структуру.
 const createParentPreviewLesson = (enrollment) => ({
   ...enrollment.lesson,
   childName: enrollment.child?.fullName,
@@ -88,6 +96,7 @@ const createParentPreviewLesson = (enrollment) => ({
   canCancel: enrollment.status === "BOOKED" && isFutureOrTodayLesson(enrollment),
 });
 
+// Функция getParentScheduleTone: возвращает значение или подготовленные данные по входным параметрам.
 const getParentScheduleTone = (status) => {
   if (status === "PRESENT" || status === "ATTENDED") {
     return "success";
@@ -100,6 +109,7 @@ const getParentScheduleTone = (status) => {
   return "planned";
 };
 
+// Общая функция загрузки списка занятий: ей пользуются и админ/преподаватель, и экран после создания/редактирования.
 const requestLessons = async ({ title, age, date }) => {
   const params = {};
 
@@ -119,6 +129,7 @@ const requestLessons = async ({ title, age, date }) => {
   return data.items;
 };
 
+// React-компонент LessonsPage: собирает экран и связывает его с состоянием и API.
 export function LessonsPage() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
@@ -144,6 +155,7 @@ export function LessonsPage() {
   const localeCode = LOCALE_CODE_MAP[locale] || LOCALE_CODE_MAP.ru;
 
   const refreshLessons = useCallback(async () => {
+    // После сохранения/удаления перезагружаем только список занятий, не пересобирая весь экран заново.
     try {
       const items = await requestLessons({
         title: deferredTitle,
@@ -164,12 +176,15 @@ export function LessonsPage() {
   }, [deferredTitle, filters.age, filters.date, showToast, t]);
 
   useEffect(() => {
+    // Админ и преподаватель работают с общим каталогом занятий.
+    // Только админу дополнительно нужен список преподавателей для формы создания.
     if (user.role === "PARENT") {
       return;
     }
 
     let cancelled = false;
 
+    // Служебная функция syncLessons: инкапсулирует отдельный шаг логики этого модуля.
     const syncLessons = async () => {
       try {
         const [items, teachersResponse] = await Promise.all([
@@ -212,10 +227,13 @@ export function LessonsPage() {
   }, [deferredTitle, filters.age, filters.date, showToast, t, user.role]);
 
   useEffect(() => {
+    // У родителя расписание строится не по общему каталогу занятий,
+    // а по его реальным записям, чтобы он видел только свои события.
     if (user.role !== "PARENT") {
       return;
     }
 
+    // Функция fetchParentSchedule: загружает данные и обновляет состояние.
     const fetchParentSchedule = async () => {
       try {
         const { data } = await api.get("/enrollments/my");
@@ -233,6 +251,7 @@ export function LessonsPage() {
   }, [showToast, t, user.role]);
 
   useEffect(() => {
+    // Параметр mode=create позволяет открыть модалку создания из быстрых действий на dashboard.
     if (searchParams.get("mode") !== "create" || !canManage) {
       return;
     }
@@ -265,6 +284,8 @@ export function LessonsPage() {
   );
 
   const lessonsByDay = useMemo(() => {
+    // Для календаря заранее группируем занятия по ключу YYYY-MM-DD,
+    // чтобы месяц/неделя/день рендерились из одной и той же структуры.
     const buckets = new Map();
 
     for (const lesson of sortedLessons) {
@@ -306,6 +327,7 @@ export function LessonsPage() {
   );
 
   const parentLessonsByDay = useMemo(() => {
+    // Родительский календарь использует те же ячейки дней, но события берёт из enrollment, а не из lesson.
     const buckets = new Map();
 
     for (const enrollment of parentSchedule) {
@@ -352,6 +374,7 @@ export function LessonsPage() {
     return formatDate(cursorDate, locale);
   }, [cursorDate, locale, monthTitle, viewMode, weekDays]);
 
+  // Функция handleFilterChange: обрабатывает пользовательское действие или событие.
   const handleFilterChange = (event) => {
     const { name, value } = event.target;
     setFilters((current) => ({ ...current, [name]: value }));
@@ -361,6 +384,7 @@ export function LessonsPage() {
     }
   };
 
+  // Функция openCreate: открывает связанный экран, модалку или сценарий.
   const openCreate = () => {
     setEditingLesson(null);
     setForm({
@@ -371,6 +395,7 @@ export function LessonsPage() {
     setModalOpen(true);
   };
 
+  // Функция openEdit: открывает связанный экран, модалку или сценарий.
   const openEdit = (lesson) => {
     setEditingLesson(lesson);
     setForm({
@@ -389,12 +414,14 @@ export function LessonsPage() {
     setModalOpen(true);
   };
 
+  // Функция resetModal: закрывает или сбрасывает локальное состояние.
   const resetModal = () => {
     setEditingLesson(null);
     setForm(emptyLesson);
     setModalOpen(false);
   };
 
+  // Функция handleFormChange: обрабатывает пользовательское действие или событие.
   const handleFormChange = (event) => {
     const { name, value } = event.target;
     if (name === "teacherId") {
@@ -410,6 +437,7 @@ export function LessonsPage() {
     setForm((current) => ({ ...current, [name]: value }));
   };
 
+  // Функция handleSaveLesson: обрабатывает пользовательское действие или событие.
   const handleSaveLesson = async (event) => {
     event.preventDefault();
 
@@ -448,6 +476,7 @@ export function LessonsPage() {
     }
   };
 
+  // Функция handleDeleteLesson: обрабатывает пользовательское действие или событие.
   const handleDeleteLesson = async (lesson) => {
     if (!window.confirm(t("lessons.deleteConfirm", { name: lesson.title }))) {
       return;
@@ -471,6 +500,7 @@ export function LessonsPage() {
     }
   };
 
+  // Функция handleCancelEnrollment: обрабатывает пользовательское действие или событие.
   const handleCancelEnrollment = async (enrollmentId) => {
     try {
       await api.patch(`/enrollments/${enrollmentId}/cancel`);
@@ -496,6 +526,7 @@ export function LessonsPage() {
     }
   };
 
+  // Служебная функция navigatePeriod: инкапсулирует отдельный шаг логики этого модуля.
   const navigatePeriod = (direction) => {
     setCursorDate((current) => {
       if (viewMode === "month") {
@@ -510,11 +541,13 @@ export function LessonsPage() {
     });
   };
 
+  // Функция handleMoreDay: обрабатывает пользовательское действие или событие.
   const handleMoreDay = (date) => {
     setCursorDate(date);
     setViewMode("day");
   };
 
+  // Служебная функция renderLessonEntry: инкапсулирует отдельный шаг логики этого модуля.
   const renderLessonEntry = (lesson) => (
     <button
       key={lesson.id}
@@ -533,6 +566,7 @@ export function LessonsPage() {
     </button>
   );
 
+  // Служебная функция renderParentLessonEntry: инкапсулирует отдельный шаг логики этого модуля.
   const renderParentLessonEntry = (enrollment) => {
     const lesson = enrollment.lesson;
     const childShortName = enrollment.child?.fullName?.split(" ")[0] || "";

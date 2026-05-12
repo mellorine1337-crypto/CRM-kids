@@ -1,3 +1,4 @@
+// Кратко: административный экран со статусами внешних интеграций.
 import { Link2, RefreshCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
@@ -18,6 +19,7 @@ const defaultForm = {
   notes: "",
 };
 
+// Служебная функция mapIntegrationToForm: инкапсулирует отдельный шаг логики этого модуля.
 const mapIntegrationToForm = (integration) => ({
   type: integration.type,
   name: integration.name,
@@ -27,6 +29,7 @@ const mapIntegrationToForm = (integration) => ({
   notes: integration.notes || "",
 });
 
+// React-компонент IntegrationsPage: собирает экран и связывает его с состоянием и API.
 export function IntegrationsPage() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
@@ -38,6 +41,7 @@ export function IntegrationsPage() {
   const [form, setForm] = useState(defaultForm);
 
   useEffect(() => {
+    // Функция loadIntegrations: загружает данные и обновляет состояние.
     const loadIntegrations = async () => {
       try {
         const { data } = await api.get("/integrations");
@@ -74,12 +78,14 @@ export function IntegrationsPage() {
     return <Navigate to="/" replace />;
   }
 
+  // Функция handleSelect: обрабатывает пользовательское действие или событие.
   const handleSelect = (integration) => {
     selectedIdRef.current = integration.id;
     setSelectedId(integration.id);
     setForm(mapIntegrationToForm(integration));
   };
 
+  // Функция handleFieldChange: обрабатывает пользовательское действие или событие.
   const handleFieldChange = (event) => {
     const { name, value } = event.target;
 
@@ -89,6 +95,7 @@ export function IntegrationsPage() {
     }));
   };
 
+  // Функция handleSave: обрабатывает пользовательское действие или событие.
   const handleSave = async (event) => {
     event.preventDefault();
 
@@ -114,12 +121,14 @@ export function IntegrationsPage() {
     }
   };
 
+  // Функция handleCreateNew: обрабатывает пользовательское действие или событие.
   const handleCreateNew = () => {
     selectedIdRef.current = "";
     setSelectedId("");
     setForm(defaultForm);
   };
 
+  // Функция handleSync: обрабатывает пользовательское действие или событие.
   const handleSync = async (integrationId) => {
     try {
       await api.post(`/integrations/${integrationId}/sync`);

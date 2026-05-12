@@ -1,3 +1,4 @@
+// Кратко: список детей, их данные и операции добавления/редактирования.
 import { Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
@@ -23,6 +24,7 @@ const emptyForm = {
   medicalNotes: "",
 };
 
+// React-компонент ChildrenPage: собирает экран и связывает его с состоянием и API.
 export function ChildrenPage() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
@@ -39,6 +41,7 @@ export function ChildrenPage() {
   const [onlyDebtors, setOnlyDebtors] = useState(false);
   const canManage = user.role === "ADMIN";
 
+  // Функция loadChildren: загружает данные и обновляет состояние.
   const loadChildren = async () => {
     try {
       const { data } = await api.get("/children");
@@ -59,6 +62,7 @@ export function ChildrenPage() {
       return;
     }
 
+    // Служебная функция bootstrap: инкапсулирует отдельный шаг логики этого модуля.
     const bootstrap = async () => {
       try {
         const requests = [api.get("/children")];
@@ -111,6 +115,7 @@ export function ChildrenPage() {
     };
   }, [canManage, parents, searchParams, setSearchParams, user.role]);
 
+  // Функция resetModal: закрывает или сбрасывает локальное состояние.
   const resetModal = () => {
     setEditingChild(null);
     setForm(emptyForm);
@@ -118,6 +123,7 @@ export function ChildrenPage() {
     setModalOpen(false);
   };
 
+  // Функция openCreate: открывает связанный экран, модалку или сценарий.
   const openCreate = () => {
     setEditingChild(null);
     setForm({
@@ -128,6 +134,7 @@ export function ChildrenPage() {
     setModalOpen(true);
   };
 
+  // Функция openEdit: открывает связанный экран, модалку или сценарий.
   const openEdit = (child) => {
     setEditingChild(child);
     setForm({
@@ -141,11 +148,13 @@ export function ChildrenPage() {
     setModalOpen(true);
   };
 
+  // Функция handleChange: обрабатывает пользовательское действие или событие.
   const handleChange = (event) => {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
   };
 
+  // Служебная функция uploadAvatar: инкапсулирует отдельный шаг логики этого модуля.
   const uploadAvatar = async (childId) => {
     if (!file) {
       return;
@@ -160,6 +169,7 @@ export function ChildrenPage() {
     });
   };
 
+  // Функция handleSubmit: обрабатывает пользовательское действие или событие.
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -204,6 +214,7 @@ export function ChildrenPage() {
     }
   };
 
+  // Функция handleDelete: обрабатывает пользовательское действие или событие.
   const handleDelete = async (child) => {
     if (!window.confirm(t("children.deleteConfirm", { name: child.fullName }))) {
       return;

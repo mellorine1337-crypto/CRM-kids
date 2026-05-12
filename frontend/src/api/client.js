@@ -1,3 +1,4 @@
+// Кратко: общий HTTP-клиент Axios с base URL, auth headers и refresh-логикой.
 import axios from "axios";
 import { DEFAULT_LOCALE, LOCALE_STORAGE_KEY } from "../i18n/config.js";
 import { getMessage } from "../i18n/messages.js";
@@ -17,9 +18,11 @@ export const api = axios.create({
 let refreshPromise = null;
 const AUTH_EXPIRED_KEY = "kids-crm.authExpired";
 
+// Функция getCurrentLocale: возвращает значение или подготовленные данные по входным параметрам.
 const getCurrentLocale = () =>
   localStorage.getItem(LOCALE_STORAGE_KEY) || DEFAULT_LOCALE;
 
+// Служебная функция normalizeError: инкапсулирует отдельный шаг логики этого модуля.
 const normalizeError = (error) => {
   const locale = getCurrentLocale();
   const validationMessage =

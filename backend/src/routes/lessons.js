@@ -1,3 +1,4 @@
+// Кратко: создание, редактирование и выдача расписания занятий.
 const express = require("express");
 const { z } = require("zod");
 const { prisma } = require("../lib/prisma");
@@ -47,8 +48,10 @@ const lessonUpdateSchema = lessonBaseSchema
     },
   );
 
+// REST-маршрут USE /: обрабатывает запросы этого модуля.
 router.use(requireAuth);
 
+// REST-маршрут GET /: обрабатывает запросы этого модуля.
 router.get(
   "/",
   asyncHandler(async (req, res) => {
@@ -96,6 +99,7 @@ router.get(
   }),
 );
 
+// REST-маршрут POST /: обрабатывает запросы этого модуля.
 router.post(
   "/",
   requireRoles("ADMIN"),
@@ -143,6 +147,7 @@ router.post(
   }),
 );
 
+// REST-маршрут PATCH /:id: обрабатывает запросы этого модуля.
 router.patch(
   "/:id",
   requireRoles("ADMIN"),
@@ -203,6 +208,7 @@ router.patch(
   }),
 );
 
+// REST-маршрут DELETE /:id: обрабатывает запросы этого модуля.
 router.delete(
   "/:id",
   requireRoles("ADMIN"),

@@ -1,3 +1,4 @@
+// Кратко: экран посещаемости для родителя, преподавателя и администратора.
 import { Html5QrcodeScanner } from "html5-qrcode";
 import {
   CalendarDays,
@@ -21,6 +22,7 @@ import { compareLessonDateTime, isFutureOrTodayLesson } from "../utils/schedule.
 
 const qrReaderElementId = "attendance-qr-reader";
 
+// Функция getLessonDateTimeValue: возвращает значение или подготовленные данные по входным параметрам.
 const getLessonDateTimeValue = (source) => {
   const lesson = source.lesson || source;
   const value = new Date(lesson.date);
@@ -33,15 +35,20 @@ const getLessonDateTimeValue = (source) => {
   return value;
 };
 
+// Функция compareLessons: сравнивает значения для сортировки или выбора.
 const compareLessons = (left, right) =>
   getLessonDateTimeValue(left) - getLessonDateTimeValue(right);
 
+// Функция resolveAttendanceStatus: определяет итоговое значение по входным данным.
 const resolveAttendanceStatus = (enrollment, record) =>
   record?.status || enrollment.attendance?.status || enrollment.status;
 
+// Функция isPresentStatus: проверяет условие и возвращает логический результат.
 const isPresentStatus = (status) => status === "PRESENT" || status === "ATTENDED";
+// Функция isAbsentStatus: проверяет условие и возвращает логический результат.
 const isAbsentStatus = (status) => status === "ABSENT" || status === "MISSED";
 
+// React-компонент AttendancePage: собирает экран и связывает его с состоянием и API.
 export function AttendancePage() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
@@ -64,6 +71,7 @@ export function AttendancePage() {
   const scannerActive = scannerEnabled || hasScanModeParam;
 
   useEffect(() => {
+    // Родитель загружает только свои записи, а админ/преподаватель — занятия и общий список записей по центру.
     const bootstrap = async () => {
       try {
         if (user.role === "PARENT") {
@@ -102,10 +110,12 @@ export function AttendancePage() {
   }, [showToast, t, user.role]);
 
   useEffect(() => {
+    // Для сотрудников журнал посещаемости всегда привязан к выбранному занятию.
     if (!selectedLessonId || user.role === "PARENT") {
       return;
     }
 
+    // Функция loadAttendance: загружает данные и обновляет состояние.
     const loadAttendance = async () => {
       try {
         const { data } = await api.get(`/attendance/${selectedLessonId}`);
@@ -136,6 +146,7 @@ export function AttendancePage() {
   }, [canManageAttendance, searchParams, setSearchParams]);
 
   useEffect(() => {
+    // Здесь живёт интеграция со сканером QR: включаем её только когда сотрудник реально открыл режим сканирования.
     if (!scannerActive || !canManageAttendance) {
       return;
     }
@@ -174,10 +185,13 @@ export function AttendancePage() {
   }, [canManageAttendance, scannerActive]);
 
   useEffect(() => {
+    // После сканирования не трогаем attendance напрямую в DOM,
+    // а отправляем токен на backend, который уже решает, какую запись и как обновить.
     if (!queuedQrToken) {
       return;
     }
 
+    // Служебная функция processScan: инкапсулирует отдельный шаг логики этого модуля.
     const processScan = async () => {
       try {
         const { data } = await api.post("/attendance/scan", {
@@ -265,6 +279,7 @@ export function AttendancePage() {
     [enrollments],
   );
   const parentMonthlyAttendance = useMemo(() => {
+    // В родительском кабинете показываем уже готовый процент посещаемости, а не сырую административную таблицу.
     const now = new Date();
     const monthlyItems = parentAttendanceItems.filter((enrollment) => {
       const lessonDate = new Date(enrollment.lesson?.date);
@@ -324,6 +339,8 @@ export function AttendancePage() {
   );
 
   const lessonAttendanceStats = useMemo(() => {
+    // Сводка по занятию нужна преподавателю перед отметкой:
+    // сколько всего детей, сколько уже отмечено и сколько ещё ждут статуса.
     const summary = {
       total: lessonEnrollments.length,
       present: 0,
@@ -349,8 +366,11 @@ export function AttendancePage() {
     return summary;
   }, [attendanceByEnrollmentId, lessonEnrollments]);
 
+  // Функция handleMarkAttendance: обрабатывает пользовательское действие или событие.
   const handleMarkAttendance = async (enrollmentId, status) => {
     try {
+      // Ручная отметка и QR-сценарий сходятся в одном backend-маршруте,
+      // чтобы вся бизнес-логика статусов жила в одном месте.
       const { data } = await api.post("/attendance", {
         enrollmentId,
         status,
@@ -392,6 +412,7 @@ export function AttendancePage() {
 
   const handleLoadQrPass = useCallback(async (enrollmentId) => {
     try {
+      // Родитель получает временный QR только по конкретной записи, а не по ребёнку целиком.
       const { data } = await api.get(`/attendance/qr/${enrollmentId}`);
       setSelectedQrPass(data.qr);
     } catch (error) {
@@ -442,6 +463,7 @@ export function AttendancePage() {
     user.role,
   ]);
 
+  // Функция handleManualScanSubmit: обрабатывает пользовательское действие или событие.
   const handleManualScanSubmit = async (event) => {
     event.preventDefault();
 

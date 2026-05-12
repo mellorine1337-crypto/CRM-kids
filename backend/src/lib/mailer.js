@@ -1,8 +1,10 @@
+// Кратко: изолирует отправку email, чтобы маршруты не работали напрямую с SMTP.
 const nodemailer = require("nodemailer");
 const { env } = require("../config/env");
 
 let transporter;
 
+// Функция getTransporter: возвращает значение или подготовленные данные по входным параметрам.
 const getTransporter = async () => {
   if (transporter) {
     return transporter;
@@ -29,6 +31,7 @@ const getTransporter = async () => {
   return transporter;
 };
 
+// Служебная функция sendMail: инкапсулирует отдельный шаг логики этого модуля.
 const sendMail = async ({ to, subject, text, html }) => {
   if (!to) {
     return null;

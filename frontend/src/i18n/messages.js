@@ -1,3 +1,4 @@
+// Кратко: основной словарь всех текстов интерфейса на русском и казахском.
 export const messages = {
   ru: {
     common: {
@@ -1693,6 +1694,7 @@ export const messages = {
   },
 };
 
+// Функция getMessage: возвращает значение или подготовленные данные по входным параметрам.
 export const getMessage = (locale, key) => {
   const segments = key.split(".");
   let value = messages[locale];

@@ -1,3 +1,4 @@
+// Кратко: служебная логика для календаря, интервалов и группировки занятий по датам.
 const resolveLesson = (input) => (input?.lesson ? input.lesson : input);
 
 export const startOfDay = (value = new Date()) => {
@@ -6,6 +7,7 @@ export const startOfDay = (value = new Date()) => {
   return date;
 };
 
+// Функция getLessonDateTime: возвращает значение или подготовленные данные по входным параметрам.
 export const getLessonDateTime = (input) => {
   const lesson = resolveLesson(input);
 
@@ -19,9 +21,11 @@ export const getLessonDateTime = (input) => {
   return date;
 };
 
+// Функция compareLessonDateTime: сравнивает значения для сортировки или выбора.
 export const compareLessonDateTime = (left, right) =>
   getLessonDateTime(left) - getLessonDateTime(right);
 
+// Функция isSameCalendarDay: проверяет условие и возвращает логический результат.
 export const isSameCalendarDay = (left, right) => {
   const leftDate = new Date(left);
   const rightDate = new Date(right);
@@ -33,6 +37,7 @@ export const isSameCalendarDay = (left, right) => {
   );
 };
 
+// Функция isTodayLesson: проверяет условие и возвращает логический результат.
 export const isTodayLesson = (input) =>
   isSameCalendarDay(getLessonDateTime(input), new Date());
 

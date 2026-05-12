@@ -1,8 +1,10 @@
+// Кратко: хранит текущий язык интерфейса и функцию его переключения.
 import { useCallback, useMemo, useState } from "react";
 import { DEFAULT_LOCALE, LOCALE_STORAGE_KEY, SUPPORTED_LOCALES } from "../i18n/config.js";
 import { getMessage } from "../i18n/messages.js";
 import { LanguageContext } from "./language-context.js";
 
+// Функция resolveInitialLocale: определяет итоговое значение по входным данным.
 const resolveInitialLocale = () => {
   const storedLocale = localStorage.getItem(LOCALE_STORAGE_KEY);
 
@@ -13,6 +15,7 @@ const resolveInitialLocale = () => {
   return DEFAULT_LOCALE;
 };
 
+// Провайдер LanguageProvider: передаёт общее состояние и методы через context.
 export function LanguageProvider({ children }) {
   const [locale, setLocaleState] = useState(resolveInitialLocale);
 

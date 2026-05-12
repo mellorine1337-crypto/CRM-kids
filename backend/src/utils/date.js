@@ -1,3 +1,4 @@
+// Кратко: хранит общие функции работы с датами и возрастом ребёнка.
 const calculateAge = (birthDate) => {
   const birth = new Date(birthDate);
   const now = new Date();
@@ -11,6 +12,7 @@ const calculateAge = (birthDate) => {
   return age;
 };
 
+// Служебная функция toDateOnly: инкапсулирует отдельный шаг логики этого модуля.
 const toDateOnly = (value) => {
   const date = new Date(value);
   date.setHours(0, 0, 0, 0);

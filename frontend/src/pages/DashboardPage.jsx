@@ -1,3 +1,4 @@
+// Кратко: главная страница, которая показывает разный dashboard для разных ролей.
 import {
   AlertTriangle,
   Bell,
@@ -31,6 +32,7 @@ import {
   isTodayLesson,
 } from "../utils/schedule.js";
 
+// React-компонент DashboardPage: собирает экран и связывает его с состоянием и API.
 export function DashboardPage() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
@@ -61,8 +63,13 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Функция fetchDashboard: загружает данные и обновляет состояние.
     const fetchDashboard = async () => {
       try {
+        // У каждой роли свой источник данных:
+        // родитель видит только своих детей и финансы,
+        // преподаватель — занятия и записи,
+        // админ — ещё и управленческую аналитику.
         if (user.role === "PARENT") {
           const [
             childrenResponse,
@@ -205,6 +212,8 @@ export function DashboardPage() {
   const parentChildSummaries = useMemo(
     () =>
       data.children.map((child) => {
+        // На одном ребёнке собираем всё, что важно родителю на главной:
+        // следующее занятие, остаток занятий, долг и посещаемость.
         const recommendation = childRecommendationMap[child.id];
         const childEnrollments = data.enrollments
           .filter(
@@ -303,6 +312,7 @@ export function DashboardPage() {
     ? Math.round((parentTotals.paid / parentTotalAccrued) * 100)
     : 0;
   const parentMonthlyAttendance = useMemo(() => {
+    // Родителю не нужна сырая таблица по всем посещениям, поэтому сразу считаем готовую метрику за текущий месяц.
     const now = new Date();
     const monthlyItems = data.enrollments.filter((enrollment) => {
       if (!enrollment.lesson) {

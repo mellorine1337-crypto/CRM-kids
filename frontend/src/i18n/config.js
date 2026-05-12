@@ -1,3 +1,4 @@
+// Кратко: хранит список локалей, ключи localStorage и служебные константы локализации.
 export const LOCALE_STORAGE_KEY = "kids-crm.locale";
 
 export const SUPPORTED_LOCALES = ["ru", "kk"];

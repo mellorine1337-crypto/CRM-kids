@@ -1,21 +1,25 @@
+// Кратко: наполняет dev-базу тестовыми пользователями, детьми, занятиями и платежами.
 const bcrypt = require("bcryptjs");
 const { PrismaClient } = require("@prisma/client");
 const { env } = require("../src/config/env");
 
 const prisma = new PrismaClient();
 
+// Служебная функция atTime: инкапсулирует отдельный шаг логики этого модуля.
 const atTime = (baseDate, hours, minutes) => {
   const value = new Date(baseDate);
   value.setHours(hours, minutes, 0, 0);
   return value;
 };
 
+// Служебная функция addDays: инкапсулирует отдельный шаг логики этого модуля.
 const addDays = (baseDate, days) => {
   const value = new Date(baseDate);
   value.setDate(value.getDate() + days);
   return value;
 };
 
+// Служебная функция upsertUser: инкапсулирует отдельный шаг логики этого модуля.
 const upsertUser = async ({ fullName, email, phone, password, role }) => {
   const passwordHash = await bcrypt.hash(password, 10);
 
@@ -37,6 +41,7 @@ const upsertUser = async ({ fullName, email, phone, password, role }) => {
   });
 };
 
+// Служебная функция ensureChild: инкапсулирует отдельный шаг логики этого модуля.
 const ensureChild = async ({ parentId, fullName, birthDate, gender, medicalNotes }) => {
   const existingChild = await prisma.child.findFirst({
     where: { parentId, fullName },
@@ -182,6 +187,7 @@ const ensurePayment = async ({
   return payment;
 };
 
+// Служебная функция ensureNotification: инкапсулирует отдельный шаг логики этого модуля.
 const ensureNotification = async ({ userId, title, message, type, channel }) => {
   const existingNotification = await prisma.notification.findFirst({
     where: {
@@ -206,6 +212,7 @@ const ensureNotification = async ({ userId, title, message, type, channel }) => 
   });
 };
 
+// Служебная функция ensureAttendance: инкапсулирует отдельный шаг логики этого модуля.
 const ensureAttendance = async ({ enrollmentId, markedBy, status, comment, markedAt }) => {
   const existingAttendance = await prisma.attendance.findUnique({
     where: { enrollmentId },

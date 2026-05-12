@@ -1,3 +1,4 @@
+// Кратко: отдаёт административную аналитику по выручке, посещаемости и загрузке центра.
 const express = require("express");
 const { prisma } = require("../lib/prisma");
 const { buildEnrollmentFinancials } = require("../lib/finance");
@@ -8,11 +9,15 @@ const { serializeChild } = require("../utils/serializers");
 
 const router = express.Router();
 
+// REST-маршрут USE ADMIN: обрабатывает запросы этого модуля.
 router.use(requireAuth);
+// REST-маршрут USE: обрабатывает запросы этого модуля.
 router.use(requireRoles("ADMIN"));
 
+// Функция getMonthStart: возвращает значение или подготовленные данные по входным параметрам.
 const getMonthStart = (year, month) => new Date(year, month, 1, 0, 0, 0, 0);
 
+// REST-маршрут GET /overview: обрабатывает запросы этого модуля.
 router.get(
   "/overview",
   asyncHandler(async (_req, res) => {

@@ -1,3 +1,4 @@
+// Кратко: превращает Prisma-модели в стабильные JSON-ответы для frontend.
 const { calculateAge } = require("./date");
 const {
   buildChildFinancials,
@@ -15,6 +16,7 @@ const serializeUser = (user) => ({
   updatedAt: user.updatedAt,
 });
 
+// Функция serializeChild: преобразует данные базы в стабильный формат ответа.
 const serializeChild = (child) => ({
   id: child.id,
   parentId: child.parentId,
@@ -30,6 +32,7 @@ const serializeChild = (child) => ({
   financials: child.enrollments ? buildChildFinancials(child) : undefined,
 });
 
+// Функция serializeLesson: преобразует данные базы в стабильный формат ответа.
 const serializeLesson = (lesson) => {
   const bookedCount =
     lesson.enrollments?.filter((item) => item.status !== "CANCELLED").length ?? 0;
@@ -55,6 +58,7 @@ const serializeLesson = (lesson) => {
   };
 };
 
+// Функция serializeEnrollment: преобразует данные базы в стабильный формат ответа.
 const serializeEnrollment = (enrollment) => ({
   id: enrollment.id,
   childId: enrollment.childId,
@@ -104,6 +108,7 @@ const serializeEnrollment = (enrollment) => ({
     : undefined,
 });
 
+// Функция serializePaymentHistory: преобразует данные базы в стабильный формат ответа.
 const serializePaymentHistory = (entry) => ({
   id: entry.id,
   paymentId: entry.paymentId,
@@ -114,6 +119,7 @@ const serializePaymentHistory = (entry) => ({
   createdBy: entry.createdBy ? serializeUser(entry.createdBy) : undefined,
 });
 
+// Функция serializePayment: преобразует данные базы в стабильный формат ответа.
 const serializePayment = (payment) => ({
   id: payment.id,
   parentId: payment.parentId,
@@ -141,6 +147,7 @@ const serializePayment = (payment) => ({
     : undefined,
 });
 
+// Функция serializeNotification: преобразует данные базы в стабильный формат ответа.
 const serializeNotification = (notification) => ({
   id: notification.id,
   title: notification.title,
@@ -151,6 +158,7 @@ const serializeNotification = (notification) => ({
   readAt: notification.readAt,
 });
 
+// Функция serializeJournalEntry: преобразует данные базы в стабильный формат ответа.
 const serializeJournalEntry = (entry) => ({
   id: entry.id,
   enrollmentId: entry.enrollmentId,
@@ -183,6 +191,7 @@ const serializeJournalEntry = (entry) => ({
     : undefined,
 });
 
+// Функция serializeIntegrationConnection: преобразует данные базы в стабильный формат ответа.
 const serializeIntegrationConnection = (integration) => ({
   id: integration.id,
   type: integration.type,
@@ -196,6 +205,7 @@ const serializeIntegrationConnection = (integration) => ({
   updatedAt: integration.updatedAt,
 });
 
+// Функция serializeFeedbackMessage: преобразует данные базы в стабильный формат ответа.
 const serializeFeedbackMessage = (message) => ({
   id: message.id,
   threadId: message.threadId,
@@ -206,6 +216,7 @@ const serializeFeedbackMessage = (message) => ({
   sender: message.sender ? serializeUser(message.sender) : undefined,
 });
 
+// Функция serializeFeedbackThread: преобразует данные базы в стабильный формат ответа.
 const serializeFeedbackThread = (thread) => ({
   id: thread.id,
   subject: thread.subject,

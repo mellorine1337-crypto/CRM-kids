@@ -1,3 +1,4 @@
+// Кратко: отдаёт справочник интеграций и их статусы для административного блока.
 const express = require("express");
 const { z } = require("zod");
 const { prisma } = require("../lib/prisma");
@@ -22,9 +23,12 @@ const integrationUpdateSchema = integrationSchema
     message: "At least one field must be provided",
   });
 
+// REST-маршрут USE ADMIN: обрабатывает запросы этого модуля.
 router.use(requireAuth);
+// REST-маршрут USE /: обрабатывает запросы этого модуля.
 router.use(requireRoles("ADMIN"));
 
+// REST-маршрут GET /: обрабатывает запросы этого модуля.
 router.get(
   "/",
   asyncHandler(async (_req, res) => {
@@ -38,6 +42,7 @@ router.get(
   }),
 );
 
+// REST-маршрут POST /: обрабатывает запросы этого модуля.
 router.post(
   "/",
   asyncHandler(async (req, res) => {
@@ -59,6 +64,7 @@ router.post(
   }),
 );
 
+// REST-маршрут PATCH /:id: обрабатывает запросы этого модуля.
 router.patch(
   "/:id",
   asyncHandler(async (req, res) => {
@@ -89,6 +95,7 @@ router.patch(
   }),
 );
 
+// REST-маршрут POST /:id/sync: обрабатывает запросы этого модуля.
 router.post(
   "/:id/sync",
   asyncHandler(async (req, res) => {

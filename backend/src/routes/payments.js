@@ -1,3 +1,4 @@
+// Кратко: долги, оплаты, подтверждение платежей и финансовая история.
 const express = require("express");
 const { z } = require("zod");
 const XLSX = require("xlsx");
@@ -38,6 +39,7 @@ const exportQuerySchema = z
     "The start date must be earlier than the end date",
   );
 
+// REST-маршрут USE: обрабатывает запросы этого модуля.
 router.use(requireAuth);
 
 const paymentInclude = {
@@ -81,6 +83,7 @@ const paymentInclude = {
 
 const countableStatuses = new Set(["SUCCEEDED", "PARTIAL"]);
 
+// Функция formatDateCell: форматирует данные для вывода в интерфейсе.
 const formatDateCell = (value) => {
   const date = new Date(value);
   const year = date.getFullYear();
@@ -91,6 +94,7 @@ const formatDateCell = (value) => {
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 };
 
+// Функция getDateRange: возвращает значение или подготовленные данные по входным параметрам.
 const getDateRange = (query) => {
   const now = new Date();
 
@@ -133,6 +137,7 @@ const getDateRange = (query) => {
   }
 };
 
+// Служебная функция addPaymentHistory: инкапсулирует отдельный шаг логики этого модуля.
 const addPaymentHistory = ({ paymentId, fromStatus, toStatus, comment, createdById }) =>
   prisma.paymentHistory.create({
     data: {
@@ -144,6 +149,7 @@ const addPaymentHistory = ({ paymentId, fromStatus, toStatus, comment, createdBy
     },
   });
 
+// Функция loadEnrollment: загружает данные и обновляет состояние.
 const loadEnrollment = async (enrollmentId) => {
   const enrollment = await prisma.enrollment.findUnique({
     where: { id: enrollmentId },
@@ -157,6 +163,7 @@ const loadEnrollment = async (enrollmentId) => {
   return enrollment;
 };
 
+// Функция getOutstandingForEnrollment: возвращает значение или подготовленные данные по входным параметрам.
 const getOutstandingForEnrollment = (enrollment, ignoredPaymentId) => {
   const scopedEnrollment = ignoredPaymentId
     ? {
@@ -168,6 +175,7 @@ const getOutstandingForEnrollment = (enrollment, ignoredPaymentId) => {
   return buildEnrollmentFinancials(scopedEnrollment).debt;
 };
 
+// Функция resolveConfirmedStatus: определяет итоговое значение по входным данным.
 const resolveConfirmedStatus = (enrollment, payment) => {
   const alreadyPaid = enrollment.payments
     .filter(
@@ -182,12 +190,14 @@ const resolveConfirmedStatus = (enrollment, payment) => {
     : "PARTIAL";
 };
 
+// Служебная функция ensurePaymentAccess: инкапсулирует отдельный шаг логики этого модуля.
 const ensurePaymentAccess = (payment, user) => {
   if (user.role === "PARENT" && payment.parentId !== user.id) {
     throw { status: 403, message: "You can access only your own payments" };
   }
 };
 
+// REST-маршрут GET /my: обрабатывает запросы этого модуля.
 router.get(
   "/my",
   requireRoles("PARENT"),
@@ -206,6 +216,7 @@ router.get(
   }),
 );
 
+// REST-маршрут GET /: обрабатывает запросы этого модуля.
 router.get(
   "/",
   requireRoles("ADMIN"),
@@ -221,6 +232,7 @@ router.get(
   }),
 );
 
+// REST-маршрут GET /export: обрабатывает запросы этого модуля.
 router.get(
   "/export",
   requireRoles("ADMIN"),
@@ -275,6 +287,7 @@ router.get(
   }),
 );
 
+// REST-маршрут POST /manual: обрабатывает запросы этого модуля.
 router.post(
   "/manual",
   requireRoles("ADMIN"),
@@ -360,6 +373,7 @@ router.post(
   }),
 );
 
+// REST-маршрут POST /create-intent: обрабатывает запросы этого модуля.
 router.post(
   "/create-intent",
   asyncHandler(async (req, res) => {
@@ -440,6 +454,7 @@ router.post(
   }),
 );
 
+// REST-маршрут POST /:id/confirm: обрабатывает запросы этого модуля.
 router.post(
   "/:id/confirm",
   asyncHandler(async (req, res) => {

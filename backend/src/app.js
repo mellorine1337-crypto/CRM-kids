@@ -1,3 +1,4 @@
+// Кратко: собирает Express-приложение, подключает middleware, Swagger, API-роуты и production fallback для frontend.
 const path = require("node:path");
 const express = require("express");
 const cors = require("cors");

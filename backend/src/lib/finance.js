@@ -1,20 +1,26 @@
+// Кратко: считает финансовые показатели по детям, записям и оплатам для API и dashboard.
 const countablePaymentStatuses = new Set(["SUCCEEDED", "PARTIAL"]);
 
+// Служебная функция toNumber: инкапсулирует отдельный шаг логики этого модуля.
 const toNumber = (value) => Number(value || 0);
 
+// Функция getEnrollmentAccrued: возвращает значение или подготовленные данные по входным параметрам.
 const getEnrollmentAccrued = (enrollment) =>
   enrollment?.status === "CANCELLED" ? 0 : toNumber(enrollment?.lesson?.price);
 
+// Функция getEnrollmentPaid: возвращает значение или подготовленные данные по входным параметрам.
 const getEnrollmentPaid = (enrollment) =>
   (enrollment?.payments || [])
     .filter((payment) => countablePaymentStatuses.has(payment.status))
     .reduce((sum, payment) => sum + toNumber(payment.amount), 0);
 
+// Функция getEnrollmentPending: возвращает значение или подготовленные данные по входным параметрам.
 const getEnrollmentPending = (enrollment) =>
   (enrollment?.payments || [])
     .filter((payment) => payment.status === "PENDING")
     .reduce((sum, payment) => sum + toNumber(payment.amount), 0);
 
+// Функция buildEnrollmentFinancials: собирает итоговую структуру или вычисляемое значение.
 const buildEnrollmentFinancials = (enrollment) => {
   const accrued = getEnrollmentAccrued(enrollment);
   const paid = getEnrollmentPaid(enrollment);
@@ -40,6 +46,7 @@ const buildEnrollmentFinancials = (enrollment) => {
   };
 };
 
+// Функция buildChildFinancials: собирает итоговую структуру или вычисляемое значение.
 const buildChildFinancials = (child) => {
   const totals = (child?.enrollments || []).reduce(
     (summary, enrollment) => {

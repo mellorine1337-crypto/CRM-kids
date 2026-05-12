@@ -1,6 +1,8 @@
+// Кратко: проверяет access token и доступ пользователя по ролям.
 const { prisma } = require("../lib/prisma");
 const { verifyAccessToken } = require("../lib/tokens");
 
+// Служебная функция requireAuth: инкапсулирует отдельный шаг логики этого модуля.
 const requireAuth = async (req, _res, next) => {
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : null;
@@ -26,6 +28,7 @@ const requireAuth = async (req, _res, next) => {
   }
 };
 
+// Служебная функция requireRoles: инкапсулирует отдельный шаг логики этого модуля.
 const requireRoles = (...roles) => (req, _res, next) => {
   if (!req.user) {
     return next({ status: 401, message: "Authentication required" });

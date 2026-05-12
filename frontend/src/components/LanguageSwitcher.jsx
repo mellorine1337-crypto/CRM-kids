@@ -1,5 +1,7 @@
+// Кратко: переключатель языка интерфейса между русским и казахским.
 import { useI18n } from "../hooks/useI18n.js";
 
+// Служебная функция LanguageSwitcher: инкапсулирует отдельный шаг логики этого модуля.
 export function LanguageSwitcher() {
   const { locale, setLocale, t } = useI18n();
 

@@ -1,3 +1,4 @@
+// Кратко: управляет посещаемостью, ручными отметками и QR-сценарием входа на занятие.
 const express = require("express");
 const { z } = require("zod");
 const { prisma } = require("../lib/prisma");
@@ -19,8 +20,10 @@ const attendanceQrScanSchema = z.object({
   comment: z.string().max(1000).optional().nullable(),
 });
 
+// REST-маршрут USE: обрабатывает запросы этого модуля.
 router.use(requireAuth);
 
+// Служебная функция ensureTeacherAccessToLesson: инкапсулирует отдельный шаг логики этого модуля.
 const ensureTeacherAccessToLesson = (user, lesson) => {
   if (
     user.role === "TEACHER" &&
@@ -83,6 +86,7 @@ const saveAttendance = async ({ enrollmentId, status, comment, markedBy }) => {
   return attendance;
 };
 
+// REST-маршрут POST /: обрабатывает запросы этого модуля.
 router.post(
   "/",
   requireRoles("ADMIN", "TEACHER"),
@@ -142,6 +146,7 @@ router.post(
   }),
 );
 
+// REST-маршрут GET /qr/:enrollmentId: обрабатывает запросы этого модуля.
 router.get(
   "/qr/:enrollmentId",
   asyncHandler(async (req, res) => {
@@ -183,6 +188,7 @@ router.get(
   }),
 );
 
+// REST-маршрут POST /scan: обрабатывает запросы этого модуля.
 router.post(
   "/scan",
   requireRoles("ADMIN", "TEACHER"),
@@ -248,6 +254,7 @@ router.post(
   }),
 );
 
+// REST-маршрут GET /:lessonId: обрабатывает запросы этого модуля.
 router.get(
   "/:lessonId",
   asyncHandler(async (req, res) => {

@@ -1,5 +1,7 @@
+// Кратко: помогает раскрашивать и сортировать уведомления по смыслу и приоритету.
 const HIGH_PRIORITY_TYPES = new Set(["CLASS_CANCELLED"]);
 
+// Функция resolveNotificationPriority: определяет итоговое значение по входным данным.
 export const resolveNotificationPriority = (notification) => {
   const content = `${notification.title || ""} ${notification.message || ""}`.toLowerCase();
 

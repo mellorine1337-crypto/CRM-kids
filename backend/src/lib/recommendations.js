@@ -1,6 +1,8 @@
+// Кратко: собирает персональные рекомендации на основе посещаемости, оплат и журнала.
 const average = (items) =>
   items.length ? Math.round(items.reduce((sum, value) => sum + value, 0) / items.length) : 0;
 
+// Служебная функция toRiskLevel: инкапсулирует отдельный шаг логики этого модуля.
 const toRiskLevel = (riskScore) => {
   if (riskScore >= 7) {
     return "HIGH";
@@ -13,6 +15,7 @@ const toRiskLevel = (riskScore) => {
   return "LOW";
 };
 
+// Функция buildChildRecommendations: собирает итоговую структуру или вычисляемое значение.
 const buildChildRecommendations = ({ child, enrollments }) => {
   const activeEnrollments = enrollments.filter(
     (enrollment) => enrollment.status !== "CANCELLED",

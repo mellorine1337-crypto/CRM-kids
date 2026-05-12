@@ -1,3 +1,4 @@
+// Кратко: административная аналитика по деньгам, воронке, рискам и преподавателям.
 import {
   AlertTriangle,
   BarChart3,
@@ -72,6 +73,7 @@ const emptyAnalytics = {
   generatedAt: null,
 };
 
+// React-компонент AnalyticsPage: собирает экран и связывает его с состоянием и API.
 export function AnalyticsPage() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
@@ -79,6 +81,7 @@ export function AnalyticsPage() {
   const [analytics, setAnalytics] = useState(emptyAnalytics);
 
   useEffect(() => {
+    // Функция loadAnalytics: загружает данные и обновляет состояние.
     const loadAnalytics = async () => {
       try {
         const { data } = await api.get("/analytics/overview");

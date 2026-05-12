@@ -1,7 +1,9 @@
+// Кратко: не пускает на закрытые маршруты без авторизации.
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth.js";
 import { useI18n } from "../hooks/useI18n.js";
 
+// Компонент ProtectedRoute: управляет доступом к маршруту.
 export function ProtectedRoute({ children }) {
   const location = useLocation();
   const { initialized, user } = useAuth();

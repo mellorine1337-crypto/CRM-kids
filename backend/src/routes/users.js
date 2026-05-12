@@ -1,3 +1,4 @@
+// Кратко: профиль текущего пользователя, списки родителей/преподавателей и создание преподавателей админом.
 const bcrypt = require("bcryptjs");
 const express = require("express");
 const { z } = require("zod");
@@ -34,8 +35,10 @@ const createTeacherSchema = z.object({
   password: passwordSchema,
 });
 
+// REST-маршрут USE: обрабатывает запросы этого модуля.
 router.use(requireAuth);
 
+// Служебная функция ensureUniqueUserFields: инкапсулирует отдельный шаг логики этого модуля.
 const ensureUniqueUserFields = async ({ email, phone, excludeUserId }) => {
   const [existingEmailUser, existingPhoneUser] = await Promise.all([
     email
@@ -59,6 +62,7 @@ const ensureUniqueUserFields = async ({ email, phone, excludeUserId }) => {
   }
 };
 
+// REST-маршрут GET /me: обрабатывает запросы этого модуля.
 router.get(
   "/me",
   asyncHandler(async (req, res) => {
@@ -68,6 +72,7 @@ router.get(
   }),
 );
 
+// REST-маршрут GET /parents: обрабатывает запросы этого модуля.
 router.get(
   "/parents",
   requireRoles("ADMIN"),
@@ -85,6 +90,7 @@ router.get(
   }),
 );
 
+// REST-маршрут GET /teachers: обрабатывает запросы этого модуля.
 router.get(
   "/teachers",
   requireRoles("ADMIN"),
@@ -102,6 +108,7 @@ router.get(
   }),
 );
 
+// REST-маршрут POST /teachers: обрабатывает запросы этого модуля.
 router.post(
   "/teachers",
   requireRoles("ADMIN"),
@@ -129,6 +136,7 @@ router.post(
   }),
 );
 
+// REST-маршрут PATCH /me: обрабатывает запросы этого модуля.
 router.patch(
   "/me",
   asyncHandler(async (req, res) => {

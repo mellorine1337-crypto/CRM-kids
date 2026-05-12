@@ -1,3 +1,4 @@
+// Кратко: API-слой над персональными рекомендациями для ребёнка и родителя.
 const express = require("express");
 const { prisma } = require("../lib/prisma");
 const { buildChildRecommendations } = require("../lib/recommendations");
@@ -7,8 +8,10 @@ const { serializeChild } = require("../utils/serializers");
 
 const router = express.Router();
 
+// REST-маршрут USE /: обрабатывает запросы этого модуля.
 router.use(requireAuth);
 
+// REST-маршрут GET /: обрабатывает запросы этого модуля.
 router.get(
   "/",
   asyncHandler(async (req, res) => {

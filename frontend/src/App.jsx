@@ -1,3 +1,4 @@
+// Кратко: описывает дерево маршрутов frontend и связывает страницы с layout.
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "./components/ProtectedRoute.jsx";
 import { DashboardLayout } from "./layouts/DashboardLayout.jsx";
@@ -16,6 +17,7 @@ import { PaymentsPage } from "./pages/PaymentsPage.jsx";
 import { RecommendationsPage } from "./pages/RecommendationsPage.jsx";
 import { SettingsPage } from "./pages/SettingsPage.jsx";
 
+// Служебная функция App: инкапсулирует отдельный шаг логики этого модуля.
 function App() {
   return (
     <Routes>

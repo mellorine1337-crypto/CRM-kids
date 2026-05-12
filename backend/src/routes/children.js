@@ -1,3 +1,4 @@
+// Кратко: содержит CRUD-операции по детям и ограничения доступа для родителя/админа.
 const express = require("express");
 const { z } = require("zod");
 const { prisma } = require("../lib/prisma");
@@ -19,8 +20,10 @@ const childUpdateSchema = childSchema.partial().refine((value) => Object.keys(va
   message: "At least one field must be provided",
 });
 
+// REST-маршрут USE /: обрабатывает запросы этого модуля.
 router.use(requireAuth, requireRoles("ADMIN", "PARENT"));
 
+// REST-маршрут GET /: обрабатывает запросы этого модуля.
 router.get(
   "/",
   asyncHandler(async (req, res) => {
@@ -64,6 +67,7 @@ router.get(
   }),
 );
 
+// REST-маршрут POST /: обрабатывает запросы этого модуля.
 router.post(
   "/",
   asyncHandler(async (req, res) => {
@@ -100,6 +104,7 @@ router.post(
   }),
 );
 
+// REST-маршрут PATCH /:id: обрабатывает запросы этого модуля.
 router.patch(
   "/:id",
   asyncHandler(async (req, res) => {
@@ -136,6 +141,7 @@ router.patch(
   }),
 );
 
+// REST-маршрут DELETE /:id: обрабатывает запросы этого модуля.
 router.delete(
   "/:id",
   asyncHandler(async (req, res) => {

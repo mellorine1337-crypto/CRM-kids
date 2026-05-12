@@ -1,9 +1,12 @@
+// Кратко: приводит все ошибки API к одному формату ответа и обрабатывает 404.
 const { ZodError } = require("zod");
 
+// Служебная функция notFoundHandler: инкапсулирует отдельный шаг логики этого модуля.
 const notFoundHandler = (_req, _res, next) => {
   next({ status: 404, message: "Route not found" });
 };
 
+// Служебная функция errorHandler: инкапсулирует отдельный шаг логики этого модуля.
 const errorHandler = (error, _req, res, _next) => {
   if (error instanceof ZodError) {
     return res.status(400).json({

@@ -1,3 +1,4 @@
+// Кратко: электронный журнал преподавателя с темами, домашками и комментариями.
 import { BookOpen, MessageSquareMore, Save } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
@@ -21,6 +22,7 @@ const defaultJournalForm = {
   teacherComment: "",
 };
 
+// Служебная функция toDateInput: инкапсулирует отдельный шаг логики этого модуля.
 const toDateInput = (value) => {
   if (!value) {
     return "";
@@ -29,6 +31,7 @@ const toDateInput = (value) => {
   return new Date(value).toISOString().slice(0, 10);
 };
 
+// Служебная функция mapEntryToForm: инкапсулирует отдельный шаг логики этого модуля.
 const mapEntryToForm = (entry) => ({
   enrollmentId: entry.enrollmentId,
   topicSummary: entry.topicSummary || "",
@@ -41,6 +44,7 @@ const mapEntryToForm = (entry) => ({
   teacherComment: entry.teacherComment || "",
 });
 
+// React-компонент JournalPage: собирает экран и связывает его с состоянием и API.
 export function JournalPage() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
@@ -54,6 +58,7 @@ export function JournalPage() {
   const [parentComment, setParentComment] = useState("");
 
   useEffect(() => {
+    // Функция loadJournal: загружает данные и обновляет состояние.
     const loadJournal = async () => {
       try {
         const [journalResponse, enrollmentResponse] = await Promise.all([
@@ -115,6 +120,7 @@ export function JournalPage() {
     [entries, selectedEntryId],
   );
 
+  // Функция handleSelectEntry: обрабатывает пользовательское действие или событие.
   const handleSelectEntry = (entry) => {
     selectedEntryIdRef.current = entry.id;
     setSelectedEntryId(entry.id);
@@ -122,6 +128,7 @@ export function JournalPage() {
     setParentComment(entry.parentComment || "");
   };
 
+  // Функция handleJournalField: обрабатывает пользовательское действие или событие.
   const handleJournalField = (event) => {
     const { name, value } = event.target;
 
@@ -143,6 +150,7 @@ export function JournalPage() {
     }));
   };
 
+  // Функция handleSaveJournal: обрабатывает пользовательское действие или событие.
   const handleSaveJournal = async (event) => {
     event.preventDefault();
 
@@ -174,6 +182,7 @@ export function JournalPage() {
     }
   };
 
+  // Функция handleSaveParentComment: обрабатывает пользовательское действие или событие.
   const handleSaveParentComment = async (event) => {
     event.preventDefault();
 

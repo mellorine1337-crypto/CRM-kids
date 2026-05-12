@@ -1,3 +1,4 @@
+// Кратко: отвечает за записи детей на занятия и проверку бизнес-ограничений.
 const express = require("express");
 const { z } = require("zod");
 const { prisma } = require("../lib/prisma");
@@ -14,6 +15,7 @@ const createEnrollmentSchema = z.object({
   lessonId: z.string(),
 });
 
+// REST-маршрут USE: обрабатывает запросы этого модуля.
 router.use(requireAuth);
 
 const enrollmentInclude = {
@@ -34,6 +36,7 @@ const enrollmentInclude = {
   },
 };
 
+// REST-маршрут POST /: обрабатывает запросы этого модуля.
 router.post(
   "/",
   asyncHandler(async (req, res) => {
@@ -128,6 +131,7 @@ router.post(
   }),
 );
 
+// REST-маршрут GET /my: обрабатывает запросы этого модуля.
 router.get(
   "/my",
   requireRoles("PARENT"),
@@ -148,6 +152,7 @@ router.get(
   }),
 );
 
+// REST-маршрут GET /: обрабатывает запросы этого модуля.
 router.get(
   "/",
   requireRoles("ADMIN", "TEACHER"),
@@ -174,6 +179,7 @@ router.get(
   }),
 );
 
+// REST-маршрут PATCH /:id/cancel: обрабатывает запросы этого модуля.
 router.patch(
   "/:id/cancel",
   asyncHandler(async (req, res) => {

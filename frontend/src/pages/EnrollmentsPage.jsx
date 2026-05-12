@@ -1,3 +1,4 @@
+// Кратко: административный список записей детей на занятия.
 import { Ban } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api/client.js";
@@ -8,6 +9,7 @@ import { useI18n } from "../hooks/useI18n.js";
 import { useToast } from "../hooks/useToast.js";
 import { formatDate, formatStatus } from "../utils/format.js";
 
+// React-компонент EnrollmentsPage: собирает экран и связывает его с состоянием и API.
 export function EnrollmentsPage() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
@@ -15,6 +17,7 @@ export function EnrollmentsPage() {
   const [enrollments, setEnrollments] = useState([]);
   const endpoint = user.role === "PARENT" ? "/enrollments/my" : "/enrollments";
 
+  // Функция loadEnrollments: загружает данные и обновляет состояние.
   const loadEnrollments = async () => {
     try {
       const { data } = await api.get(endpoint);
@@ -29,6 +32,7 @@ export function EnrollmentsPage() {
   };
 
   useEffect(() => {
+    // Служебная функция bootstrap: инкапсулирует отдельный шаг логики этого модуля.
     const bootstrap = async () => {
       try {
         const { data } = await api.get(endpoint);
@@ -45,6 +49,7 @@ export function EnrollmentsPage() {
     bootstrap();
   }, [endpoint, showToast, t]);
 
+  // Функция handleCancel: обрабатывает пользовательское действие или событие.
   const handleCancel = async (enrollment) => {
     try {
       await api.patch(`/enrollments/${enrollment.id}/cancel`);

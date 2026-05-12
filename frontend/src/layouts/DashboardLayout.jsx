@@ -1,3 +1,4 @@
+// Кратко: общий shell приложения с sidebar, topbar и выходом в вложенные страницы.
 import {
   Bell,
   LogOut,
@@ -14,6 +15,7 @@ import { useAuth } from "../hooks/useAuth.js";
 import { useI18n } from "../hooks/useI18n.js";
 import { formatRole } from "../utils/format.js";
 
+// React-компонент DashboardLayout: формирует общий каркас интерфейса.
 export function DashboardLayout() {
   const { user, logout } = useAuth();
   const { locale, t } = useI18n();
@@ -29,6 +31,7 @@ export function DashboardLayout() {
   );
 
   useEffect(() => {
+    // Функция loadUnread: загружает данные и обновляет состояние.
     const loadUnread = async () => {
       try {
         const { data } = await api.get("/notifications");
@@ -41,6 +44,7 @@ export function DashboardLayout() {
     loadUnread();
   }, [location.pathname]);
 
+  // Функция handleLogout: обрабатывает пользовательское действие или событие.
   const handleLogout = async () => {
     await logout();
     navigate("/login");

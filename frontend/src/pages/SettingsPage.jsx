@@ -1,3 +1,4 @@
+// Кратко: профиль пользователя и, для администратора, управление преподавателями.
 import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../api/client.js";
@@ -6,6 +7,7 @@ import { useAuth } from "../hooks/useAuth.js";
 import { useI18n } from "../hooks/useI18n.js";
 import { useToast } from "../hooks/useToast.js";
 
+// React-компонент SettingsPage: собирает экран и связывает его с состоянием и API.
 export function SettingsPage() {
   const { user, updateProfile } = useAuth();
   const { t } = useI18n();
@@ -30,10 +32,12 @@ export function SettingsPage() {
   });
 
   useEffect(() => {
+    // Список преподавателей нужен только админу: обычным ролям не отдаём лишние данные и не делаем лишний запрос.
     if (user.role !== "ADMIN") {
       return;
     }
 
+    // Функция loadTeachers: загружает данные и обновляет состояние.
     const loadTeachers = async () => {
       setLoadingTeachers(true);
 
@@ -50,16 +54,19 @@ export function SettingsPage() {
     void loadTeachers();
   }, [user.role]);
 
+  // Функция handleChange: обрабатывает пользовательское действие или событие.
   const handleChange = (event) => {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
   };
 
+  // Функция handleTeacherChange: обрабатывает пользовательское действие или событие.
   const handleTeacherChange = (event) => {
     const { name, value } = event.target;
     setTeacherForm((current) => ({ ...current, [name]: value }));
   };
 
+  // Обычные настройки относятся к текущему пользователю, поэтому update идёт через users/me.
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSaving(true);
@@ -89,11 +96,14 @@ export function SettingsPage() {
     }
   };
 
+  // Функция handleTeacherSubmit: обрабатывает пользовательское действие или событие.
   const handleTeacherSubmit = async (event) => {
     event.preventDefault();
     setCreatingTeacher(true);
 
     try {
+      // После создания нового преподавателя сразу добавляем его в локальный список,
+      // чтобы админ видел результат без повторной загрузки страницы.
       const { data } = await api.post("/users/teachers", teacherForm);
       setTeachers((current) =>
         [...current, data.user].sort((left, right) =>
@@ -202,6 +212,7 @@ export function SettingsPage() {
       </section>
 
       {user.role === "ADMIN" ? (
+        // Админский блок вынесен в настройки как простой MVP-способ управлять преподавателями без отдельного CRUD-раздела.
         <section className="panel stack-lg">
           <div className="stack-sm">
             <h2>{t("settings.teachersTitle")}</h2>

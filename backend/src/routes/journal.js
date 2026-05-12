@@ -1,3 +1,4 @@
+// Кратко: электронный журнал, домашние задания, оценки прогресса и комментарии.
 const express = require("express");
 const { z } = require("zod");
 const { prisma } = require("../lib/prisma");
@@ -60,6 +61,7 @@ const journalInclude = {
   },
 };
 
+// Функция buildScope: собирает итоговую структуру или вычисляемое значение.
 const buildScope = (user, childId) => ({
   ...(user.role === "PARENT"
     ? {
@@ -93,6 +95,7 @@ const buildScope = (user, childId) => ({
       : {}),
 });
 
+// Служебная функция normalizeHomeworkStatus: инкапсулирует отдельный шаг логики этого модуля.
 const normalizeHomeworkStatus = (inputStatus, dueDate) => {
   if (!dueDate) {
     return inputStatus ?? null;
@@ -109,6 +112,7 @@ const normalizeHomeworkStatus = (inputStatus, dueDate) => {
   return inputStatus ?? "ASSIGNED";
 };
 
+// Функция loadJournalEntry: загружает данные и обновляет состояние.
 const loadJournalEntry = async (id, user) => {
   const entry = await prisma.journalEntry.findFirst({
     where: {
@@ -125,8 +129,10 @@ const loadJournalEntry = async (id, user) => {
   return entry;
 };
 
+// REST-маршрут USE /: обрабатывает запросы этого модуля.
 router.use(requireAuth);
 
+// REST-маршрут GET /: обрабатывает запросы этого модуля.
 router.get(
   "/",
   asyncHandler(async (req, res) => {
@@ -143,6 +149,7 @@ router.get(
   }),
 );
 
+// REST-маршрут GET /:id: обрабатывает запросы этого модуля.
 router.get(
   "/:id",
   asyncHandler(async (req, res) => {
@@ -154,6 +161,7 @@ router.get(
   }),
 );
 
+// REST-маршрут POST /: обрабатывает запросы этого модуля.
 router.post(
   "/",
   requireRoles("TEACHER"),
@@ -229,6 +237,7 @@ router.post(
   }),
 );
 
+// REST-маршрут PATCH /:id/parent-comment: обрабатывает запросы этого модуля.
 router.patch(
   "/:id/parent-comment",
   requireRoles("PARENT"),

@@ -1,3 +1,4 @@
+// Кратко: реализует регистрацию, вход, refresh и logout для родителя, преподавателя и администратора.
 const bcrypt = require("bcryptjs");
 const express = require("express");
 const { z } = require("zod");
@@ -19,6 +20,8 @@ const {
 
 const router = express.Router();
 
+// Схемы описывают три независимых сценария входа:
+// админ по email, родитель по телефону и регистрации, преподаватель по телефону.
 const adminLoginSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
@@ -40,6 +43,7 @@ const refreshSchema = z.object({
   refreshToken: z.string().min(10),
 });
 
+// Refresh-токен храним в базе в хэшированном виде, чтобы не держать его как открытый секрет.
 const persistRefreshToken = async (userId, refreshToken) => {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + env.jwt.refreshTtlDays);
@@ -53,6 +57,7 @@ const persistRefreshToken = async (userId, refreshToken) => {
   });
 };
 
+// Единая точка выдачи сессии: после успешного входа/регистрации всегда возвращаем пользователя и пару токенов.
 const issueSession = async (user) => {
   const tokens = buildTokenPair(user);
   await persistRefreshToken(user.id, tokens.refreshToken);
@@ -63,6 +68,7 @@ const issueSession = async (user) => {
   };
 };
 
+// Для публичной регистрации родителя сразу страхуемся от дублей по email и телефону.
 const ensureEmailAndPhoneAreFree = async ({ email, phone }) => {
   const [existingEmailUser, existingPhoneUser] = await Promise.all([
     prisma.user.findUnique({
@@ -82,6 +88,7 @@ const ensureEmailAndPhoneAreFree = async ({ email, phone }) => {
   }
 };
 
+// Логика сравнения пароля вынесена отдельно, чтобы не дублировать её в трёх разных маршрутах входа.
 const verifyPasswordOrThrow = async ({ user, password, message }) => {
   if (!user) {
     throw { status: 401, message };
@@ -94,6 +101,7 @@ const verifyPasswordOrThrow = async ({ user, password, message }) => {
   }
 };
 
+// Отдельный логин администратора: только роль ADMIN и только вход по email.
 router.post(
   "/admin/login",
   asyncHandler(async (req, res) => {
@@ -116,6 +124,7 @@ router.post(
   }),
 );
 
+// Исторический alias для старого фронта: ведёт на тот же admin login, чтобы не ломать совместимость.
 router.post(
   "/login",
   asyncHandler(async (req, res) => {
@@ -138,6 +147,7 @@ router.post(
   }),
 );
 
+// Родитель сам создаёт аккаунт, поэтому роль фиксируется на backend и не приходит из формы.
 router.post(
   "/parent/register",
   asyncHandler(async (req, res) => {
@@ -162,6 +172,7 @@ router.post(
   }),
 );
 
+// Вход родителя отделён от преподавателя по роли, даже если телефоны выглядят одинаково.
 router.post(
   "/parent/login",
   asyncHandler(async (req, res) => {
@@ -183,6 +194,7 @@ router.post(
   }),
 );
 
+// Преподаватель входит тем же способом, но ищется только среди TEACHER.
 router.post(
   "/teacher/login",
   asyncHandler(async (req, res) => {
@@ -204,6 +216,7 @@ router.post(
   }),
 );
 
+// Refresh не просто выдаёт новый access token, а ротирует сам refresh token и инвалидирует старый.
 router.post(
   "/refresh",
   asyncHandler(async (req, res) => {
@@ -245,6 +258,7 @@ router.post(
   }),
 );
 
+// Logout удаляет refresh из базы, чтобы этой сессией нельзя было воспользоваться повторно.
 router.post(
   "/logout",
   asyncHandler(async (req, res) => {

@@ -1,3 +1,4 @@
+// Кратко: изолирует Stripe Elements и подтверждение онлайн-оплаты.
 import { useMemo, useState } from "react";
 import {
   Elements,
@@ -8,12 +9,14 @@ import {
 import { loadStripe } from "@stripe/stripe-js";
 import { useI18n } from "../hooks/useI18n.js";
 
+// Служебная функция CheckoutForm: инкапсулирует отдельный шаг логики этого модуля.
 function CheckoutForm({ paymentId, onConfirm, onError }) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
   const { t } = useI18n();
 
+  // Функция handleSubmit: обрабатывает пользовательское действие или событие.
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -51,6 +54,7 @@ function CheckoutForm({ paymentId, onConfirm, onError }) {
   );
 }
 
+// Служебная функция StripePaymentForm: инкапсулирует отдельный шаг логики этого модуля.
 export function StripePaymentForm({
   paymentId,
   clientSecret,

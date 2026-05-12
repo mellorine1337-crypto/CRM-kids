@@ -1,5 +1,7 @@
+// Кратко: переиспользуемое модальное окно для форм и деталей сущностей.
 import { useI18n } from "../hooks/useI18n.js";
 
+// Служебная функция Modal: инкапсулирует отдельный шаг логики этого модуля.
 export function Modal({ open, title, onClose, children }) {
   const { t } = useI18n();
 

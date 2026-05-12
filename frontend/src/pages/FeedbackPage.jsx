@@ -1,3 +1,4 @@
+// Кратко: интерфейс диалогов между родителем и преподавателем.
 import { MessageSquare, SendHorizontal } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
@@ -16,6 +17,7 @@ const defaultComposeState = {
   childId: "",
 };
 
+// React-компонент FeedbackPage: собирает экран и связывает его с состоянием и API.
 export function FeedbackPage() {
   const { user } = useAuth();
   const { locale, t } = useI18n();
@@ -43,6 +45,7 @@ export function FeedbackPage() {
     return options.children.filter((child) => child.parentId === composeForm.parentId);
   }, [composeForm.parentId, options.children, user.role]);
 
+  // Функция openThread: открывает связанный экран, модалку или сценарий.
   const openThread = async (threadId) => {
     setSelectedThreadId(threadId);
 
@@ -63,6 +66,7 @@ export function FeedbackPage() {
     }
   };
 
+  // Функция loadThreads: загружает данные и обновляет состояние.
   const loadThreads = async (preferredThreadId) => {
     const { data } = await api.get("/feedback");
     setThreads(data.items);
@@ -83,6 +87,7 @@ export function FeedbackPage() {
       return;
     }
 
+    // Служебная функция bootstrap: инкапсулирует отдельный шаг логики этого модуля.
     const bootstrap = async () => {
       try {
         const [optionsResponse, threadsResponse] = await Promise.all([
@@ -122,6 +127,7 @@ export function FeedbackPage() {
     bootstrap();
   }, [showToast, t, user.role]);
 
+  // Функция handleComposeChange: обрабатывает пользовательское действие или событие.
   const handleComposeChange = (event) => {
     const { name, value } = event.target;
 
@@ -132,6 +138,7 @@ export function FeedbackPage() {
     }));
   };
 
+  // Функция handleCreateThread: обрабатывает пользовательское действие или событие.
   const handleCreateThread = async (event) => {
     event.preventDefault();
 
@@ -177,6 +184,7 @@ export function FeedbackPage() {
     }
   };
 
+  // Функция handleReply: обрабатывает пользовательское действие или событие.
   const handleReply = async (event) => {
     event.preventDefault();
 
@@ -207,6 +215,7 @@ export function FeedbackPage() {
     }
   };
 
+  // Функция getCounterparty: возвращает значение или подготовленные данные по входным параметрам.
   const getCounterparty = (thread) => (user.role === "PARENT" ? thread.staff : thread.parent);
 
   if (!["PARENT", "TEACHER"].includes(user.role)) {

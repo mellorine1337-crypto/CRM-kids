@@ -1,3 +1,4 @@
+// Кратко: список уведомлений пользователя и отметка прочтения.
 const express = require("express");
 const { prisma } = require("../lib/prisma");
 const { requireAuth } = require("../middleware/auth");
@@ -6,8 +7,10 @@ const { serializeNotification } = require("../utils/serializers");
 
 const router = express.Router();
 
+// REST-маршрут USE /: обрабатывает запросы этого модуля.
 router.use(requireAuth);
 
+// REST-маршрут GET /: обрабатывает запросы этого модуля.
 router.get(
   "/",
   asyncHandler(async (req, res) => {
@@ -24,6 +27,7 @@ router.get(
   }),
 );
 
+// REST-маршрут PATCH /:id/read: обрабатывает запросы этого модуля.
 router.patch(
   "/:id/read",
   asyncHandler(async (req, res) => {

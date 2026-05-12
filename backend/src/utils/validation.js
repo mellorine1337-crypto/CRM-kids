@@ -1,3 +1,4 @@
+// Кратко: описывает общие схемы валидации email, телефона, имени и пароля.
 const { z } = require("zod");
 
 const EMAIL_FORMAT_MESSAGE =
@@ -9,10 +10,12 @@ const PASSWORD_LENGTH_MESSAGE = "Password must contain at least 8 characters";
 const PASSWORD_FORMAT_MESSAGE =
   "Password must use only English letters, numbers, and symbols";
 
+// Служебная функция normalizePhone: инкапсулирует отдельный шаг логики этого модуля.
 const normalizePhone = (value) => value.trim().replace(/\s+/g, " ");
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const passwordPattern = /^[\x21-\x7E]+$/;
 
+// Функция isValidPhone: проверяет условие и возвращает логический результат.
 const isValidPhone = (value) => {
   const trimmedValue = normalizePhone(value);
 
