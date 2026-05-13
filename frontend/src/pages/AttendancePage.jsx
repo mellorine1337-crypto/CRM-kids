@@ -1,5 +1,4 @@
 // Кратко: экран посещаемости для родителя, преподавателя и администратора.
-import { Html5QrcodeScanner } from "html5-qrcode";
 import {
   CalendarDays,
   Check,
@@ -151,38 +150,57 @@ export function AttendancePage() {
       return;
     }
 
-    const scanner = new Html5QrcodeScanner(
-      qrReaderElementId,
-      {
-        fps: 10,
-        qrbox: { width: 220, height: 220 },
-        rememberLastUsedCamera: true,
-      },
-      false,
-    );
-
     let active = true;
-    scannerRef.current = scanner;
+    let scanner = null;
 
-    scanner.render(
-      (decodedText) => {
-        if (!active) {
-          return;
-        }
+    const mountScanner = async () => {
+      const { Html5QrcodeScanner } = await import("html5-qrcode");
 
-        setManualQrToken(decodedText);
-        setQueuedQrToken(decodedText);
-        setScannerEnabled(false);
-      },
-      () => {},
-    );
+      if (!active) {
+        return;
+      }
+
+      scanner = new Html5QrcodeScanner(
+        qrReaderElementId,
+        {
+          fps: 10,
+          qrbox: { width: 220, height: 220 },
+          rememberLastUsedCamera: true,
+        },
+        false,
+      );
+
+      scannerRef.current = scanner;
+      scanner.render(
+        (decodedText) => {
+          if (!active) {
+            return;
+          }
+
+          setManualQrToken(decodedText);
+          setQueuedQrToken(decodedText);
+          setScannerEnabled(false);
+        },
+        () => {},
+      );
+    };
+
+    mountScanner().catch((error) => {
+      showToast({
+        title: t("attendance.qrScanFailed"),
+        description: error.message,
+        tone: "error",
+      });
+    });
 
     return () => {
       active = false;
       scannerRef.current = null;
-      Promise.resolve(scanner.clear()).catch(() => {});
+      if (scanner) {
+        Promise.resolve(scanner.clear()).catch(() => {});
+      }
     };
-  }, [canManageAttendance, scannerActive]);
+  }, [canManageAttendance, scannerActive, showToast, t]);
 
   useEffect(() => {
     // После сканирования не трогаем attendance напрямую в DOM,
