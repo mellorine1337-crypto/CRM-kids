@@ -4,7 +4,7 @@ services:
     runtime: node
     rootDir: .
     plan: free
-    buildCommand: npm install && npm run prisma:generate --workspace backend && npm run build --workspace frontend
+    buildCommand: npm install --include=dev && npm run prisma:generate --workspace backend && npm run build --workspace frontend
     startCommand: npm run start:render --workspace backend
     healthCheckPath: /api/health
     envVars:
