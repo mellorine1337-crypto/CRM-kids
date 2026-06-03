@@ -592,6 +592,23 @@ async function main() {
     },
   });
 
+  const enrollmentSix = await prisma.enrollment.upsert({
+    where: {
+      childId_lessonId: {
+        childId: childTwo.id,
+        lessonId: lessonFive.id,
+      },
+    },
+    update: {
+      status: "BOOKED",
+    },
+    create: {
+      childId: childTwo.id,
+      lessonId: lessonFive.id,
+      status: "BOOKED",
+    },
+  });
+
   await ensurePayment({
     parentId: parent.id,
     enrollmentId: enrollmentOne.id,
@@ -655,6 +672,19 @@ async function main() {
     recordedById: admin.id,
     paidAt: atTime(addDays(today, -1), 17, 0),
     historyComment: "Полная оплата подтверждена",
+  });
+
+  await ensurePayment({
+    parentId: parent.id,
+    enrollmentId: enrollmentSix.id,
+    amount: 3000,
+    status: "PARTIAL",
+    method: "QR",
+    serviceLabel: lessonFive.title,
+    comment: "Будущее занятие частично оплачено через QR",
+    recordedById: admin.id,
+    paidAt: atTime(today, 12, 0),
+    historyComment: "Создана частичная оплата для будущего занятия",
   });
 
   await ensureAttendance({
