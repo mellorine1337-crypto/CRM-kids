@@ -15,7 +15,7 @@ const app = express();
 const openApiDocument = YAML.load(path.join(__dirname, "../docs/openapi.yaml"));
 const isDevelopment = env.nodeEnv !== "production";
 const frontendDistDir = path.resolve(__dirname, "../../frontend/dist");
-const allowedOrigins = new Set([env.frontendUrl]);
+const configuredOrigins = new Set([env.frontendUrl]);
 // В dev-режиме разрешаем локальные адреса сети, потому что Vite часто запускается на другом порту или по LAN IP.
 const devOriginPatterns = [
   /^http:\/\/localhost:\d+$/,
@@ -25,27 +25,49 @@ const devOriginPatterns = [
   /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+:\d+$/,
 ];
 
+// Для одного домена frontend+backend модульные ассеты идут с Origin текущего host.
+// Поэтому на проде добавляем в allowlist не только FRONTEND_URL, но и origin реального запроса.
+function buildRequestOrigin(req) {
+  const host = req.get("host");
+
+  if (!host) {
+    return null;
+  }
+
+  const protocol = req.get("x-forwarded-proto") || req.protocol || "https";
+  return `${protocol}://${host}`;
+}
+
 app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin) {
-        callback(null, true);
-        return;
-      }
+  cors((req, callback) => {
+    const allowedOrigins = new Set(configuredOrigins);
+    const requestOrigin = buildRequestOrigin(req);
 
-      if (allowedOrigins.has(origin)) {
-        callback(null, true);
-        return;
-      }
+    if (requestOrigin) {
+      allowedOrigins.add(requestOrigin);
+    }
 
-      if (isDevelopment && devOriginPatterns.some((pattern) => pattern.test(origin))) {
-        callback(null, true);
-        return;
-      }
+    callback(null, {
+      credentials: true,
+      origin(origin, originCallback) {
+        if (!origin) {
+          originCallback(null, true);
+          return;
+        }
 
-      callback(new Error("Origin is not allowed by CORS"));
-    },
-    credentials: true,
+        if (allowedOrigins.has(origin)) {
+          originCallback(null, true);
+          return;
+        }
+
+        if (isDevelopment && devOriginPatterns.some((pattern) => pattern.test(origin))) {
+          originCallback(null, true);
+          return;
+        }
+
+        originCallback(new Error("Origin is not allowed by CORS"));
+      },
+    });
   }),
 );
 app.use(helmet());
